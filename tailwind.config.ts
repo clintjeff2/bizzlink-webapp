@@ -63,6 +63,9 @@ const config: Config = {
         "primary-green-light": "#23f075",
         "primary-green-dark": "#00d455",
       },
+      fontFamily: {
+        sans: ['var(--font-inter)', 'system-ui', 'sans-serif'],
+      },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
