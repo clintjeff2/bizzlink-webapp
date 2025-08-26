@@ -1,74 +1,21 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { Navigation } from "@/components/navigation"
-import { ArrowRight, ArrowLeft, MapPin, Globe, Clock, Languages, User, Phone, Calendar } from "lucide-react"
+import { ArrowRight, ArrowLeft, MapPin, Globe, Clock, Languages, User, Phone, Calendar, Loader2, Camera } from "lucide-react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-
-const countries = [
-  "United States",
-  "Canada",
-  "United Kingdom",
-  "Australia",
-  "Germany",
-  "France",
-  "Spain",
-  "Italy",
-  "Netherlands",
-  "Sweden",
-  "Norway",
-  "Denmark",
-  "Finland",
-  "Switzerland",
-  "Austria",
-  "Belgium",
-  "Portugal",
-  "Ireland",
-  "New Zealand",
-  "Japan",
-  "South Korea",
-  "Singapore",
-  "Hong Kong",
-  "India",
-  "Brazil",
-  "Mexico",
-  "Argentina",
-  "Chile",
-  "Colombia",
-  "South Africa",
-  "Nigeria",
-  "Kenya",
-  "Egypt",
-  "Morocco",
-  "Israel",
-  "Turkey",
-  "Russia",
-  "Ukraine",
-  "Poland",
-  "Czech Republic",
-  "Hungary",
-  "Romania",
-  "Bulgaria",
-  "Croatia",
-  "Serbia",
-  "Greece",
-  "Cyprus",
-  "Malta",
-  "Luxembourg",
-  "Estonia",
-  "Latvia",
-  "Lithuania",
-  "Slovenia",
-  "Slovakia",
-  "Other",
-]
+import { useOnboardingData } from "@/lib/redux/useOnboardingData"
+import { useToast } from "@/hooks/use-toast"
+import { allCountries, popularCountries, type Country } from "@/lib/countries"
+import PhoneInput from "@/components/ui/phone-input"
+import ImageUpload from "@/components/ui/image-upload"
+import { useLocationData, type LocationData } from "@/lib/hooks/useLocationData"
 
 const timezones = [
   "UTC-12:00 (Baker Island)",
@@ -133,7 +80,10 @@ const languages = [
 
 export default function LocationPage() {
   const router = useRouter()
-  const [country, setCountry] = useState("")
+  const { toast } = useToast()
+  const { saveLocationData, isUpdating } = useLocationData()
+  
+  const [selectedCountry, setSelectedCountry] = useState<Country | null>(null)
   const [city, setCity] = useState("")
   const [timezone, setTimezone] = useState("")
   const [primaryLanguage, setPrimaryLanguage] = useState("")
@@ -144,6 +94,18 @@ export default function LocationPage() {
   const [linkedinUrl, setLinkedinUrl] = useState("")
   const [websiteUrl, setWebsiteUrl] = useState("")
   const [githubUrl, setGithubUrl] = useState("")
+  const [profileImage, setProfileImage] = useState("")
+  const [profileImageFile, setProfileImageFile] = useState<File | null>(null)
+  const [dataLoaded, setDataLoaded] = useState(false)
+
+  // Load existing data when component mounts
+  useEffect(() => {
+    if (!dataLoaded) {
+      // For now, this is the final step so we don't need to load existing data
+      // In a real app, you might want to load existing location data
+      setDataLoaded(true)
+    }
+  }, [dataLoaded])
 
   const addLanguage = (language: string) => {
     if (!additionalLanguages.includes(language) && language !== primaryLanguage) {
@@ -155,41 +117,113 @@ export default function LocationPage() {
     setAdditionalLanguages(additionalLanguages.filter((lang) => lang !== language))
   }
 
-  const handleNext = () => {
-    if (country && city && timezone && primaryLanguage) {
-      router.push("/freelancer/onboarding/complete")
+  const handleNext = async () => {
+    if (!selectedCountry || !city || !timezone || !primaryLanguage) {
+      toast({
+        title: "Please complete required fields",
+        description: "Country, city, timezone, and primary language are required.",
+        variant: "destructive"
+      })
+      return
+    }
+
+    try {
+      const locationData: LocationData = {
+        country: selectedCountry.name,
+        countryCode: selectedCountry.code,
+        city,
+        timezone,
+        primaryLanguage,
+        additionalLanguages,
+        phoneNumber: phoneNumber || undefined,
+        dateOfBirth: dateOfBirth || undefined,
+        bio: bio || undefined,
+        linkedinUrl: linkedinUrl || undefined,
+        websiteUrl: websiteUrl || undefined,
+        githubUrl: githubUrl || undefined,
+        profileImageFile: profileImageFile || undefined,
+      }
+      
+      const success = await saveLocationData(locationData)
+      
+      if (success) {
+        router.push("/freelancer/dashboard")
+      }
+    } catch (err: any) {
+      console.error('Error in handleNext:', err)
+      toast({
+        title: "Unexpected error",
+        description: "Please try again.",
+        variant: "destructive"
+      })
     }
   }
 
-  const handleSkip = () => {
-    router.push("/freelancer/onboarding/complete")
+  const handleSkip = async () => {
+    try {
+      router.push("/freelancer/dashboard")
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: "Failed to proceed. Please try again.",
+        variant: "destructive"
+      })
+    }
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
-      <Navigation />
-
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Progress Bar */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center space-x-4">
-              <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-medium">
-                7
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Location & Personal Info</h1>
-                <p className="text-gray-600">Tell us about yourself and where you're located</p>
-              </div>
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Progress Bar */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center space-x-4">
+            <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-medium">
+              7
             </div>
-            <div className="text-sm text-gray-500">Step 7 of 7</div>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Location & Personal Info</h1>
+              <p className="text-gray-600">Tell us about yourself and where you're located</p>
+            </div>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
-            <div className="bg-blue-600 h-2 rounded-full" style={{ width: "100%" }}></div>
-          </div>
+          <div className="text-sm text-gray-500">Step 7 of 7</div>
         </div>
+        <div className="w-full bg-gray-200 rounded-full h-2">
+          <div className="bg-blue-600 h-2 rounded-full" style={{ width: "100%" }}></div>
+        </div>
+      </div>
 
-        <div className="space-y-8">
+      <div className="space-y-8">
+          {/* Profile Image */}
+          <Card className="border-0 shadow-lg">
+            <CardHeader className="pb-6">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-purple-100 rounded-lg">
+                  <Camera className="w-6 h-6 text-purple-600" />
+                </div>
+                <div>
+                  <CardTitle className="text-xl text-gray-900">Profile Photo</CardTitle>
+                  <p className="text-gray-600 mt-1">Upload a professional photo to help clients recognize you</p>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <ImageUpload
+                value={profileImage}
+                onChange={(url) => {
+                  setProfileImage(url)
+                  // Note: We'll handle the actual file in the onDrop callback
+                }}
+                onError={(error) => toast({
+                  title: "Upload Error",
+                  description: error,
+                  variant: "destructive"
+                })}
+                disabled={isUpdating}
+                onFileSelect={(file) => setProfileImageFile(file)}
+              />
+            </CardContent>
+          </Card>
+
           {/* Location Information */}
           <Card className="border-0 shadow-lg">
             <CardHeader className="pb-6">
@@ -209,16 +243,50 @@ export default function LocationPage() {
                   <Label htmlFor="country" className="text-sm font-medium text-gray-700">
                     Country *
                   </Label>
-                  <Select value={country} onValueChange={setCountry}>
+                  <Select 
+                    value={selectedCountry?.code || ""} 
+                    onValueChange={(value) => {
+                      const country = allCountries.find(c => c.code === value)
+                      if (country) setSelectedCountry(country)
+                    }}
+                  >
                     <SelectTrigger className="h-12">
-                      <SelectValue placeholder="Select your country" />
+                      <SelectValue placeholder="Select your country">
+                        {selectedCountry && (
+                          <div className="flex items-center space-x-2">
+                            <span className="text-lg">{selectedCountry.flag}</span>
+                            <span>{selectedCountry.name}</span>
+                          </div>
+                        )}
+                      </SelectValue>
                     </SelectTrigger>
-                    <SelectContent>
-                      {countries.map((countryName) => (
-                        <SelectItem key={countryName} value={countryName}>
-                          {countryName}
-                        </SelectItem>
-                      ))}
+                    <SelectContent className="max-h-[300px]">
+                      <div className="p-2">
+                        <p className="text-xs font-medium text-gray-500 mb-2">POPULAR COUNTRIES</p>
+                        {popularCountries.map((country) => (
+                          <SelectItem key={`popular-${country.code}`} value={country.code} className="flex items-center">
+                            <div className="flex items-center space-x-2">
+                              <span className="text-lg">{country.flag}</span>
+                              <span>{country.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </div>
+                      <div className="border-t">
+                        <div className="p-2">
+                          <p className="text-xs font-medium text-gray-500 mb-2">ALL COUNTRIES</p>
+                          {allCountries
+                            .filter(country => !popularCountries.some(p => p.code === country.code))
+                            .map((country) => (
+                            <SelectItem key={country.code} value={country.code}>
+                              <div className="flex items-center space-x-2">
+                                <span className="text-lg">{country.flag}</span>
+                                <span>{country.name}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </div>
+                      </div>
                     </SelectContent>
                   </Select>
                 </div>
@@ -351,17 +419,30 @@ export default function LocationPage() {
                   <Label htmlFor="phone" className="text-sm font-medium text-gray-700">
                     Phone Number
                   </Label>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                    <Input
-                      id="phone"
-                      type="tel"
-                      placeholder="+1 (555) 123-4567"
-                      value={phoneNumber}
-                      onChange={(e) => setPhoneNumber(e.target.value)}
-                      className="pl-10 h-12"
-                    />
-                  </div>
+                  <PhoneInput
+                    value={phoneNumber}
+                    onChange={setPhoneNumber}
+                    onCountryChange={(country) => {
+                      // Optional: Update timezone based on country
+                      if (!timezone) {
+                        // Auto-suggest timezone based on country (simplified logic)
+                        const timezoneMap: { [key: string]: string } = {
+                          'US': 'UTC-05:00 (Eastern Time)',
+                          'GB': 'UTC+00:00 (London, Dublin)',
+                          'DE': 'UTC+01:00 (Paris, Berlin)',
+                          'JP': 'UTC+09:00 (Tokyo, Seoul)',
+                          'AU': 'UTC+10:00 (Sydney, Melbourne)',
+                          'CA': 'UTC-05:00 (Eastern Time)',
+                          'FR': 'UTC+01:00 (Paris, Berlin)',
+                          'IN': 'UTC+05:30 (Mumbai, Delhi)',
+                          'CN': 'UTC+08:00 (Beijing, Singapore)',
+                        }
+                        const suggestedTimezone = timezoneMap[country.code]
+                        if (suggestedTimezone) setTimezone(suggestedTimezone)
+                      }
+                    }}
+                    placeholder="Enter your phone number"
+                  />
                 </div>
 
                 <div className="space-y-2">
@@ -458,28 +539,41 @@ export default function LocationPage() {
 
           <div className="flex justify-between pt-6">
             <Button asChild variant="outline" className="flex items-center space-x-2 bg-transparent">
-              <Link href="/freelancer/onboarding/skills">
+              <Link href="/freelancer/onboarding/rates">
                 <ArrowLeft className="w-4 h-4" />
                 <span>Back</span>
               </Link>
             </Button>
 
             <div className="flex space-x-3">
-              <Button variant="ghost" onClick={handleSkip} className="text-gray-600 hover:text-gray-900">
-                Skip for now
+              <Button 
+                variant="ghost" 
+                onClick={handleSkip} 
+                disabled={isUpdating}
+                className="text-gray-600 hover:text-gray-900"
+              >
+                {isUpdating ? "Saving..." : "Skip for now"}
               </Button>
               <Button
                 onClick={handleNext}
-                disabled={!country || !city || !timezone || !primaryLanguage}
+                disabled={!selectedCountry || !city || !timezone || !primaryLanguage || isUpdating}
                 className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white flex items-center space-x-2"
               >
-                <span>Complete Setup</span>
-                <ArrowRight className="w-4 h-4" />
+                {isUpdating ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Saving...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Complete Setup</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
               </Button>
             </div>
           </div>
         </div>
       </div>
-    </div>
   )
 }
