@@ -1,16 +1,17 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Navigation } from "@/components/navigation"
-import { ArrowRight, ArrowLeft, DollarSign, Clock, TrendingUp, Info } from "lucide-react"
+import { ArrowRight, ArrowLeft, DollarSign, Clock, TrendingUp, Info, Loader2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { useOnboardingData } from "@/lib/redux/useOnboardingData"
+import { useToast } from "@/hooks/use-toast"
 
 const experienceLevels = [
   { value: "entry", label: "Entry Level", range: "$10-25/hr", description: "New to freelancing" },
@@ -28,16 +29,80 @@ const currencies = [
 
 export default function RatesPage() {
   const router = useRouter()
+  const { toast } = useToast()
+  const { 
+    onboardingData, 
+    saveRates, 
+    isLoading, 
+    error,
+    hasData 
+  } = useOnboardingData()
+  
   const [pricingModel, setPricingModel] = useState("")
   const [hourlyRate, setHourlyRate] = useState("")
   const [currency, setCurrency] = useState("USD")
   const [experienceLevel, setExperienceLevel] = useState("")
   const [minimumProject, setMinimumProject] = useState("")
   const [availability, setAvailability] = useState("")
+  const [formData, setFormData] = useState({
+    professionalTitle: "",
+    overview: ""
+  })
+  const [isSaving, setIsSaving] = useState(false)
 
-  const handleNext = () => {
-    if (pricingModel && (hourlyRate || pricingModel === "project")) {
-      router.push("/freelancer/onboarding/skills")
+  // Load existing data when component mounts
+  useEffect(() => {
+    if (hasData && onboardingData?.rates) {
+      const hourRate = onboardingData.rates.hourRate || ""
+      const title = onboardingData.rates.title || ""
+      const overview = onboardingData.rates.overview || ""
+      
+      // Only update if we have actual data
+      if (hourRate) setHourlyRate(hourRate)
+      if (title || overview) {
+        setFormData({
+          professionalTitle: title,
+          overview: overview
+        })
+      }
+    }
+  }, [hasData])
+
+  const handleNext = async () => {
+    if (!hourlyRate?.trim() || !formData.professionalTitle?.trim()) {
+      toast({
+        title: "Please complete your profile",
+        description: "Hourly rate and professional title are required.",
+        variant: "destructive"
+      })
+      return
+    }
+
+    try {
+      setIsSaving(true)
+      
+      // Format hourly rate with currency
+      const formattedRate = `${currency === 'USD' ? '$' : currency === 'EUR' ? '€' : '£'} ${hourlyRate}`
+      
+      const success = await saveRates(formattedRate, formData.professionalTitle, formData.overview)
+      
+      if (success) {
+        toast({
+          title: "Profile completed!",
+          description: "Your freelancer profile has been saved successfully."
+        })
+        router.push("/freelancer/onboarding/location")
+      } else {
+        throw new Error("Failed to save profile data")
+      }
+    } catch (err: any) {
+      toast({
+        title: "Error saving profile",
+        description: err.message || "Please try again.",
+        variant: "destructive"
+      })
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -47,26 +112,23 @@ export default function RatesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
-      <Navigation />
-
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Progress Bar */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-4">
               <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-medium">
-                5
+                6
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">Rates & Pricing</h1>
                 <p className="text-gray-600">Set your pricing and availability</p>
               </div>
             </div>
-            <div className="text-sm text-gray-500">Step 5 of 7</div>
+            <div className="text-sm text-gray-500">Step 6 of 7</div>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2">
-            <div className="bg-blue-600 h-2 rounded-full" style={{ width: "71.4%" }}></div>
+            <div className="bg-blue-600 h-2 rounded-full" style={{ width: "85.7%" }}></div>
           </div>
         </div>
 
@@ -108,6 +170,42 @@ export default function RatesPage() {
                   <TrendingUp className="w-5 h-5 text-gray-400" />
                 </div>
               </RadioGroup>
+            </CardContent>
+          </Card>
+
+          {/* Professional Title and Overview */}
+          <Card className="border-0 shadow-lg">
+            <CardHeader className="pb-6">
+              <CardTitle className="text-xl text-gray-900">Professional Profile</CardTitle>
+              <p className="text-gray-600">Complete your professional identity</p>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="professionalTitle" className="text-sm font-medium text-gray-700">
+                  Professional Title *
+                </Label>
+                <Input
+                  id="professionalTitle"
+                  placeholder="e.g., Senior Full Stack Developer, UX/UI Designer"
+                  value={formData.professionalTitle}
+                  onChange={(e) => setFormData({ ...formData, professionalTitle: e.target.value })}
+                  className="h-12"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="overview" className="text-sm font-medium text-gray-700">
+                  Professional Overview *
+                </Label>
+                <textarea
+                  id="overview"
+                  placeholder="Describe your professional background, expertise, and what makes you unique..."
+                  value={formData.overview}
+                  onChange={(e) => setFormData({ ...formData, overview: e.target.value })}
+                  className="w-full min-h-[120px] p-3 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  rows={5}
+                />
+              </div>
             </CardContent>
           </Card>
 
@@ -266,7 +364,7 @@ export default function RatesPage() {
 
           <div className="flex justify-between pt-6">
             <Button asChild variant="outline" className="flex items-center space-x-2 bg-transparent">
-              <Link href="/freelancer/onboarding/experience">
+              <Link href="/freelancer/onboarding/skills">
                 <ArrowLeft className="w-4 h-4" />
                 <span>Back</span>
               </Link>
@@ -274,15 +372,23 @@ export default function RatesPage() {
 
             <Button
               onClick={handleNext}
-              disabled={!pricingModel || (pricingModel === "hourly" && !hourlyRate)}
+              disabled={!hourlyRate?.trim() || !formData.professionalTitle?.trim() || isSaving}
               className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white flex items-center space-x-2"
             >
-              <span>Continue</span>
-              <ArrowRight className="w-4 h-4" />
+              {isSaving ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Saving...</span>
+                </>
+              ) : (
+                <>
+                  <span>Continue</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
             </Button>
           </div>
         </div>
       </div>
-    </div>
   )
 }
