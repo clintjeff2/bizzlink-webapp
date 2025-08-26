@@ -1,28 +1,18 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Navigation } from "@/components/navigation"
-import { ArrowRight, ArrowLeft, Plus, X, GraduationCap, Calendar, MapPin } from "lucide-react"
+import { ArrowRight, ArrowLeft, Plus, X, GraduationCap, Calendar, MapPin, Loader2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-
-interface Education {
-  id: string
-  school: string
-  degree: string
-  field: string
-  startYear: string
-  endYear: string
-  current: boolean
-  description: string
-  location: string
-}
+import { useOnboardingData } from "@/lib/redux/useOnboardingData"
+import { useToast } from "@/hooks/use-toast"
+import type { UserEducation } from "@/lib/redux/types/firebaseTypes"
 
 const degreeTypes = [
   "High School Diploma",
@@ -37,62 +27,134 @@ const degreeTypes = [
 
 export default function EducationPage() {
   const router = useRouter()
-  const [educations, setEducations] = useState<Education[]>([
+  const { toast } = useToast()
+  const { 
+    onboardingData, 
+    saveEducation, 
+    isLoading, 
+    error,
+    hasData 
+  } = useOnboardingData()
+  
+  const [educations, setEducations] = useState<UserEducation[]>([
     {
-      id: "1",
-      school: "",
-      degree: "",
-      field: "",
-      startYear: "",
-      endYear: "",
-      current: false,
-      description: "",
+      id: 1,
+      schoolName: "",
       location: "",
+      degree: "",
+      studyField: "",
+      startDate: "",
+      endDate: "",
+      description: "",
     },
   ])
+  const [isSaving, setIsSaving] = useState(false)
+  const [dataLoaded, setDataLoaded] = useState(false)
+
+  // Load existing data when component mounts
+  useEffect(() => {
+    if (hasData && onboardingData.education.length > 0 && !dataLoaded) {
+      // Ensure all education entries have the location field
+      const educationsWithLocation = onboardingData.education.map(edu => ({
+        ...edu,
+        location: edu.location || ""
+      }))
+      setEducations(educationsWithLocation)
+      setDataLoaded(true)
+    }
+  }, [hasData, onboardingData.education.length, dataLoaded])
 
   const addEducation = () => {
-    const newEducation: Education = {
-      id: Date.now().toString(),
-      school: "",
-      degree: "",
-      field: "",
-      startYear: "",
-      endYear: "",
-      current: false,
-      description: "",
+    const newEducation: UserEducation = {
+      id: Date.now(),
+      schoolName: "",
       location: "",
+      degree: "",
+      studyField: "",
+      startDate: "",
+      endDate: "",
+      description: "",
     }
     setEducations([...educations, newEducation])
   }
 
-  const removeEducation = (id: string) => {
+  const removeEducation = (id: number) => {
     if (educations.length > 1) {
       setEducations(educations.filter((edu) => edu.id !== id))
     }
   }
 
-  const updateEducation = (id: string, field: keyof Education, value: any) => {
-    setEducations(educations.map((edu) => (edu.id === id ? { ...edu, [field]: value } : edu)))
+  const updateEducation = (id: number, field: keyof UserEducation, value: any) => {
+    setEducations(educations.map((edu) => 
+      edu.id === id ? { ...edu, [field]: value } : edu
+    ))
   }
 
-  const handleNext = () => {
+  const handleNext = async () => {
     // Validate at least one education entry
-    const hasValidEducation = educations.some((edu) => edu.school && edu.degree && edu.field)
+    const hasValidEducation = educations.some((edu) => edu.schoolName && edu.degree && edu.studyField)
 
-    if (hasValidEducation) {
-      router.push("/freelancer/onboarding/portfolio")
+    if (!hasValidEducation) {
+      toast({
+        title: "Please add your education",
+        description: "Add at least one educational qualification to continue.",
+        variant: "destructive"
+      })
+      return
+    }
+
+    try {
+      setIsSaving(true)
+      
+      // Filter out empty education entries
+      const validEducations = educations.filter(edu => 
+        edu.schoolName.trim() && edu.degree.trim() && edu.studyField.trim()
+      )
+
+      const success = await saveEducation(validEducations)
+      
+      if (success) {
+        toast({
+          title: "Education saved!",
+          description: "Your educational background has been saved successfully."
+        })
+        router.push("/freelancer/onboarding/portfolio")
+      } else {
+        throw new Error("Failed to save education data")
+      }
+    } catch (err: any) {
+      toast({
+        title: "Error saving education",
+        description: err.message || "Please try again.",
+        variant: "destructive"
+      })
+    } finally {
+      setIsSaving(false)
     }
   }
 
-  const handleSkip = () => {
-    router.push("/freelancer/onboarding/portfolio")
+  const handleSkip = async () => {
+    try {
+      setIsSaving(true)
+      
+      // Save empty array to indicate user chose to skip
+      const success = await saveEducation([])
+      
+      if (success) {
+        router.push("/freelancer/onboarding/portfolio")
+      }
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: "Failed to skip education step. Please try again.",
+        variant: "destructive"
+      })
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
-      <Navigation />
-
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Progress Bar */}
         <div className="mb-8">
@@ -152,8 +214,8 @@ export default function EducationPage() {
                     <Input
                       id={`school-${education.id}`}
                       placeholder="e.g., Stanford University"
-                      value={education.school}
-                      onChange={(e) => updateEducation(education.id, "school", e.target.value)}
+                      value={education.schoolName || ""}
+                      onChange={(e) => updateEducation(education.id, "schoolName", e.target.value)}
                       className="h-12"
                     />
                   </div>
@@ -167,7 +229,7 @@ export default function EducationPage() {
                       <Input
                         id={`location-${education.id}`}
                         placeholder="e.g., Stanford, CA"
-                        value={education.location}
+                        value={education.location || ""}
                         onChange={(e) => updateEducation(education.id, "location", e.target.value)}
                         className="pl-10 h-12"
                       />
@@ -179,7 +241,7 @@ export default function EducationPage() {
                       Degree/Certification *
                     </Label>
                     <Select
-                      value={education.degree}
+                      value={education.degree || ""}
                       onValueChange={(value) => updateEducation(education.id, "degree", value)}
                     >
                       <SelectTrigger className="h-12">
@@ -202,8 +264,8 @@ export default function EducationPage() {
                     <Input
                       id={`field-${education.id}`}
                       placeholder="e.g., Computer Science"
-                      value={education.field}
-                      onChange={(e) => updateEducation(education.id, "field", e.target.value)}
+                      value={education.studyField || ""}
+                      onChange={(e) => updateEducation(education.id, "studyField", e.target.value)}
                       className="h-12"
                     />
                   </div>
@@ -215,8 +277,8 @@ export default function EducationPage() {
                     <div className="relative">
                       <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                       <Select
-                        value={education.startYear}
-                        onValueChange={(value) => updateEducation(education.id, "startYear", value)}
+                        value={education.startDate || ""}
+                        onValueChange={(value) => updateEducation(education.id, "startDate", value)}
                       >
                         <SelectTrigger className="pl-10 h-12">
                           <SelectValue placeholder="Start year" />
@@ -242,12 +304,12 @@ export default function EducationPage() {
                     <div className="relative">
                       <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                       <Select
-                        value={education.endYear}
-                        onValueChange={(value) => updateEducation(education.id, "endYear", value)}
-                        disabled={education.current}
+                        value={education.endDate || ""}
+                        onValueChange={(value) => updateEducation(education.id, "endDate", value)}
+                        disabled={false}
                       >
                         <SelectTrigger className="pl-10 h-12">
-                          <SelectValue placeholder={education.current ? "Present" : "End year"} />
+                          <SelectValue placeholder="End year" />
                         </SelectTrigger>
                         <SelectContent>
                           {Array.from({ length: 35 }, (_, i) => {
@@ -261,23 +323,6 @@ export default function EducationPage() {
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="flex items-center space-x-2 mt-2">
-                      <input
-                        type="checkbox"
-                        id={`current-${education.id}`}
-                        checked={education.current}
-                        onChange={(e) => {
-                          updateEducation(education.id, "current", e.target.checked)
-                          if (e.target.checked) {
-                            updateEducation(education.id, "endYear", "")
-                          }
-                        }}
-                        className="rounded border-gray-300"
-                      />
-                      <Label htmlFor={`current-${education.id}`} className="text-sm text-gray-600">
-                        I'm currently studying here
-                      </Label>
-                    </div>
                   </div>
                 </div>
 
@@ -288,7 +333,7 @@ export default function EducationPage() {
                   <Textarea
                     id={`description-${education.id}`}
                     placeholder="Describe your achievements, relevant coursework, or activities..."
-                    value={education.description}
+                    value={education.description || ""}
                     onChange={(e) => updateEducation(education.id, "description", e.target.value)}
                     rows={3}
                   />
@@ -315,21 +360,36 @@ export default function EducationPage() {
               </Button>
 
               <div className="flex space-x-3">
-                <Button variant="ghost" onClick={handleSkip} className="text-gray-600 hover:text-gray-900">
-                  Skip for now
+                <Button 
+                  variant="ghost" 
+                  onClick={handleSkip} 
+                  disabled={isSaving || isLoading}
+                  className="text-gray-600 hover:text-gray-900"
+                >
+                  {(isSaving || isLoading) ? "Saving..." : "Skip for now"}
                 </Button>
                 <Button
                   onClick={handleNext}
+                  disabled={isSaving || isLoading}
                   className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white flex items-center space-x-2"
                 >
-                  <span>Continue</span>
-                  <ArrowRight className="w-4 h-4" />
+                  {(isSaving || isLoading) ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Continue</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
                 </Button>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
-    </div>
+
   )
 }
