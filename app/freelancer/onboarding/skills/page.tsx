@@ -1,12 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Navigation } from "@/components/navigation"
 import {
   ArrowRight,
   ArrowLeft,
@@ -21,16 +20,13 @@ import {
   Camera,
   Shield,
   Globe,
+  Loader2,
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-
-interface Skill {
-  id: string
-  name: string
-  level: "beginner" | "intermediate" | "expert"
-  category: string
-}
+import { useOnboardingData } from "@/lib/redux/useOnboardingData"
+import { useToast } from "@/hooks/use-toast"
+import type { UserSkill } from "@/lib/redux/types/firebaseTypes"
 
 const skillCategories = {
   "Programming Languages": {
@@ -47,29 +43,26 @@ const skillCategories = {
       "Express.js",
       "Next.js",
       "Nuxt.js",
-      "HTML5",
-      "CSS3",
-      "SASS",
-      "Bootstrap",
-      "Tailwind CSS",
+      "Django",
+      "Flask",
+      "Laravel",
+      "Spring Boot",
+      "ASP.NET"
     ],
-  },
-  "Mobile Development": {
-    icon: <Code className="w-5 h-5" />,
-    skills: ["React Native", "Flutter", "iOS Development", "Android Development", "Xamarin", "Ionic", "Cordova"],
   },
   "Design Tools": {
     icon: <Palette className="w-5 h-5" />,
     skills: [
       "Figma",
-      "Adobe XD",
+      "Adobe Photoshop",
+      "Adobe Illustrator",
       "Sketch",
-      "Photoshop",
-      "Illustrator",
-      "InDesign",
-      "After Effects",
-      "Premiere Pro",
+      "Adobe XD",
+      "InVision",
+      "Principle",
+      "Framer",
       "Canva",
+      "Adobe After Effects"
     ],
   },
   "Data & Analytics": {
@@ -81,57 +74,28 @@ const skillCategories = {
       "MySQL",
       "Redis",
       "Elasticsearch",
-      "Tableau",
       "Power BI",
+      "Tableau",
       "Google Analytics",
-      "R",
-      "MATLAB",
+      "Excel"
     ],
   },
-  "Marketing & SEO": {
+  "Marketing & Content": {
     icon: <Megaphone className="w-5 h-5" />,
     skills: [
+      "SEO",
       "Google Ads",
       "Facebook Ads",
-      "SEO",
-      "SEM",
-      "Content Marketing",
+      "Content Writing",
+      "Copywriting",
       "Email Marketing",
       "Social Media Marketing",
-      "Google Analytics",
-      "HubSpot",
-    ],
-  },
-  "Cloud & DevOps": {
-    icon: <Shield className="w-5 h-5" />,
-    skills: [
-      "AWS",
-      "Azure",
-      "Google Cloud",
-      "Docker",
-      "Kubernetes",
-      "Jenkins",
-      "Git",
-      "GitHub",
-      "GitLab",
-      "CI/CD",
-      "Terraform",
-    ],
-  },
-  "Content & Writing": {
-    icon: <PenTool className="w-5 h-5" />,
-    skills: [
-      "Copywriting",
-      "Technical Writing",
       "Content Strategy",
-      "Blog Writing",
-      "SEO Writing",
-      "Creative Writing",
-      "Proofreading",
-      "Editing",
+      "Brand Strategy",
+      "Market Research"
     ],
   },
-  "Photography & Video": {
+  "Creative": {
     icon: <Camera className="w-5 h-5" />,
     skills: [
       "Photography",
@@ -139,339 +103,324 @@ const skillCategories = {
       "Motion Graphics",
       "3D Modeling",
       "Animation",
-      "Lightroom",
-      "Final Cut Pro",
-      "DaVinci Resolve",
-    ],
-  },
-  "Soft Skills": {
-    icon: <Star className="w-5 h-5" />,
-    skills: [
-      "Communication",
-      "Project Management",
-      "Leadership",
-      "Problem Solving",
-      "Time Management",
-      "Client Relations",
-      "Presentation",
-      "Negotiation",
+      "Illustration",
+      "Logo Design",
+      "Print Design",
+      "Web Design",
+      "UI Design"
     ],
   },
 }
 
-const skillLevels = [
-  { value: "beginner", label: "Beginner", description: "Learning the basics", color: "bg-yellow-100 text-yellow-800" },
-  {
-    value: "intermediate",
-    label: "Intermediate",
-    description: "Comfortable with most tasks",
-    color: "bg-blue-100 text-blue-800",
-  },
-  { value: "expert", label: "Expert", description: "Advanced knowledge", color: "bg-green-100 text-green-800" },
+const experienceLevels = [
+  { value: "beginner", label: "Beginner", description: "Learning or just started" },
+  { value: "intermediate", label: "Intermediate", description: "Some experience" },
+  { value: "expert", label: "Expert", description: "Very experienced" },
 ]
 
 export default function SkillsPage() {
   const router = useRouter()
-  const [selectedSkills, setSelectedSkills] = useState<Skill[]>([])
+  const { toast } = useToast()
+  const { 
+    onboardingData, 
+    saveSkills, 
+    isLoading, 
+    error,
+    hasData 
+  } = useOnboardingData()
+  
+  const [selectedSkills, setSelectedSkills] = useState<UserSkill[]>([])
   const [customSkill, setCustomSkill] = useState("")
-  const [customSkillLevel, setCustomSkillLevel] = useState<"beginner" | "intermediate" | "expert">("intermediate")
-  const [searchTerm, setSearchTerm] = useState("")
-  const [selectedCategory, setSelectedCategory] = useState<string>("all")
+  const [customLevel, setCustomLevel] = useState<"beginner" | "intermediate" | "expert">("intermediate")
+  const [isSaving, setIsSaving] = useState(false)
+  const [dataLoaded, setDataLoaded] = useState(false)
 
-  const addSkill = (
-    skillName: string,
-    category: string,
-    level: "beginner" | "intermediate" | "expert" = "intermediate",
-  ) => {
-    if (!selectedSkills.find((skill) => skill.name.toLowerCase() === skillName.toLowerCase())) {
-      const newSkill: Skill = {
-        id: Date.now().toString(),
-        name: skillName,
-        level,
-        category,
-      }
-      setSelectedSkills([...selectedSkills, newSkill])
+  // Load existing data when component mounts
+  useEffect(() => {
+    if (hasData && onboardingData.skills && onboardingData.skills.length > 0 && !dataLoaded) {
+      setSelectedSkills(onboardingData.skills)
+      setDataLoaded(true)
     }
+  }, [hasData, dataLoaded])
+
+  const addSkill = (skillText: string, level: "beginner" | "intermediate" | "expert") => {
+    if (selectedSkills.some(skill => skill.text === skillText)) {
+      return
+    }
+
+    const newSkill: UserSkill = {
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      text: skillText,
+      level: level,
+      yearsOfExperience: level === "beginner" ? 1 : level === "intermediate" ? 3 : 5
+    }
+
+    setSelectedSkills([...selectedSkills, newSkill])
   }
 
-  const removeSkill = (skillId: string) => {
-    setSelectedSkills(selectedSkills.filter((skill) => skill.id !== skillId))
+  const removeSkill = (skillText: string) => {
+    setSelectedSkills(selectedSkills.filter(skill => skill.text !== skillText))
   }
 
-  const updateSkillLevel = (skillId: string, level: "beginner" | "intermediate" | "expert") => {
-    setSelectedSkills(selectedSkills.map((skill) => (skill.id === skillId ? { ...skill, level } : skill)))
+  const updateSkillLevel = (skillText: string, level: "beginner" | "intermediate" | "expert") => {
+    setSelectedSkills(selectedSkills.map(skill => 
+      skill.text === skillText 
+        ? { 
+            ...skill, 
+            level, 
+            yearsOfExperience: level === "beginner" ? 1 : level === "intermediate" ? 3 : 5 
+          }
+        : skill
+    ))
   }
 
   const addCustomSkill = () => {
     if (customSkill.trim()) {
-      addSkill(customSkill.trim(), "Custom", customSkillLevel)
+      addSkill(customSkill.trim(), customLevel)
       setCustomSkill("")
-      setCustomSkillLevel("intermediate")
+      setCustomLevel("intermediate")
     }
   }
 
-  const getFilteredSkills = () => {
-    const allSkills = Object.entries(skillCategories).flatMap(([category, data]) =>
-      data.skills.map((skill) => ({ skill, category })),
-    )
+  const handleNext = async () => {
+    if (selectedSkills.length === 0) {
+      toast({
+        title: "Please add at least one skill",
+        description: "Add your skills to help clients find you.",
+        variant: "destructive"
+      })
+      return
+    }
 
-    return allSkills.filter(({ skill, category }) => {
-      const matchesSearch = skill.toLowerCase().includes(searchTerm.toLowerCase())
-      const matchesCategory = selectedCategory === "all" || category === selectedCategory
-      const notAlreadySelected = !selectedSkills.find((s) => s.name.toLowerCase() === skill.toLowerCase())
-      return matchesSearch && matchesCategory && notAlreadySelected
-    })
-  }
-
-  const getLevelColor = (level: string) => {
-    const levelData = skillLevels.find((l) => l.value === level)
-    return levelData?.color || "bg-gray-100 text-gray-800"
-  }
-
-  const handleNext = () => {
-    if (selectedSkills.length >= 3) {
-      router.push("/freelancer/onboarding/location")
+    try {
+      setIsSaving(true)
+      
+      const success = await saveSkills(selectedSkills)
+      
+      if (success) {
+        toast({
+          title: "Skills saved!",
+          description: "Your skills have been saved successfully."
+        })
+        router.push("/freelancer/onboarding/rates")
+      } else {
+        throw new Error("Failed to save skills data")
+      }
+    } catch (err: any) {
+      toast({
+        title: "Error saving skills",
+        description: err.message || "Please try again.",
+        variant: "destructive"
+      })
+    } finally {
+      setIsSaving(false)
     }
   }
 
-  const handleSkip = () => {
-    router.push("/freelancer/onboarding/location")
+  const handleSkip = async () => {
+    try {
+      setIsSaving(true)
+      
+      // Save empty array to skip this step
+      const success = await saveSkills([])
+      
+      if (success) {
+        toast({
+          title: "Skills skipped",
+          description: "You can add skills later in your profile."
+        })
+        router.push("/freelancer/onboarding/rates")
+      }
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: "Please try again.",
+        variant: "destructive"
+      })
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
-      <Navigation />
-
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Progress Bar */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center space-x-4">
-              <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-medium">
-                6
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Skills & Expertise</h1>
-                <p className="text-gray-600">Add your technical and soft skills</p>
-              </div>
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Progress Bar */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center space-x-4">
+            <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-medium">
+              5
             </div>
-            <div className="text-sm text-gray-500">Step 6 of 7</div>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Skills & Expertise</h1>
+              <p className="text-gray-600">Add your technical and soft skills</p>
+            </div>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
-            <div className="bg-blue-600 h-2 rounded-full" style={{ width: "85.7%" }}></div>
-          </div>
+          <div className="text-sm text-gray-500">Step 5 of 7</div>
         </div>
+        <div className="w-full bg-gray-200 rounded-full h-2">
+          <div className="bg-blue-600 h-2 rounded-full" style={{ width: "71.4%" }}></div>
+        </div>
+      </div>
 
-        <div className="space-y-8">
-          {/* Selected Skills */}
-          {selectedSkills.length > 0 && (
-            <Card className="border-0 shadow-lg">
-              <CardHeader className="pb-6">
-                <CardTitle className="text-xl text-gray-900">Your Skills ({selectedSkills.length})</CardTitle>
-                <p className="text-gray-600">Manage your skill levels and expertise</p>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {selectedSkills.map((skill) => (
-                    <div key={skill.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-                      <div className="flex items-center space-x-3">
-                        <div className="flex items-center space-x-2">
-                          {skillCategories[skill.category as keyof typeof skillCategories]?.icon || (
-                            <Star className="w-5 h-5" />
-                          )}
-                          <span className="font-medium text-gray-900">{skill.name}</span>
-                        </div>
-                        <span className="text-sm text-gray-500">•</span>
-                        <span className="text-sm text-gray-600">{skill.category}</span>
-                      </div>
-                      <div className="flex items-center space-x-3">
-                        <Select
-                          value={skill.level}
-                          onValueChange={(value: "beginner" | "intermediate" | "expert") =>
-                            updateSkillLevel(skill.id, value)
-                          }
-                        >
-                          <SelectTrigger className="w-32 h-8">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {skillLevels.map((level) => (
-                              <SelectItem key={level.value} value={level.value}>
-                                {level.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <div className={`px-2 py-1 rounded-full text-xs font-medium ${getLevelColor(skill.level)}`}>
-                          {skill.level.charAt(0).toUpperCase() + skill.level.slice(1)}
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeSkill(skill.id)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0"
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Add Skills */}
+      <div className="space-y-8">
+        {/* Selected Skills */}
+        {selectedSkills.length > 0 && (
           <Card className="border-0 shadow-lg">
             <CardHeader className="pb-6">
-              <CardTitle className="text-xl text-gray-900">Add Skills</CardTitle>
-              <p className="text-gray-600">Select from popular skills or add your own (minimum 3 skills required)</p>
+              <CardTitle className="text-xl text-gray-900">Your Skills</CardTitle>
+              <p className="text-gray-600">Review and adjust your skill levels</p>
             </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Search and Filter */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="search" className="text-sm font-medium text-gray-700">
-                    Search Skills
-                  </Label>
-                  <Input
-                    id="search"
-                    placeholder="Search for skills..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="h-12"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="category" className="text-sm font-medium text-gray-700">
-                    Filter by Category
-                  </Label>
-                  <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                    <SelectTrigger className="h-12">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Categories</SelectItem>
-                      {Object.keys(skillCategories).map((category) => (
-                        <SelectItem key={category} value={category}>
-                          {category}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {/* Skill Categories */}
-              {selectedCategory === "all" ? (
-                <div className="space-y-6">
-                  {Object.entries(skillCategories).map(([category, data]) => (
-                    <div key={category}>
-                      <div className="flex items-center space-x-2 mb-3">
-                        {data.icon}
-                        <h3 className="font-semibold text-gray-900">{category}</h3>
-                      </div>
-                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                        {data.skills
-                          .filter(
-                            (skill) =>
-                              skill.toLowerCase().includes(searchTerm.toLowerCase()) &&
-                              !selectedSkills.find((s) => s.name.toLowerCase() === skill.toLowerCase()),
-                          )
-                          .map((skill) => (
-                            <Button
-                              key={skill}
-                              variant="outline"
-                              size="sm"
-                              onClick={() => addSkill(skill, category)}
-                              className="justify-start text-sm h-10 hover:bg-blue-50 hover:border-blue-300"
-                            >
-                              + {skill}
-                            </Button>
-                          ))}
-                      </div>
+            <CardContent>
+              <div className="space-y-4">
+                {selectedSkills.map((skill) => (
+                  <div key={skill.text} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <span className="font-medium text-gray-900">{skill.text}</span>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div>
-                  <div className="flex items-center space-x-2 mb-3">
-                    {skillCategories[selectedCategory as keyof typeof skillCategories]?.icon}
-                    <h3 className="font-semibold text-gray-900">{selectedCategory}</h3>
-                  </div>
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                    {getFilteredSkills().map(({ skill, category }) => (
-                      <Button
-                        key={skill}
-                        variant="outline"
-                        size="sm"
-                        onClick={() => addSkill(skill, category)}
-                        className="justify-start text-sm h-10 hover:bg-blue-50 hover:border-blue-300"
+                    <div className="flex items-center space-x-3">
+                      <Select
+                        value={skill.level}
+                        onValueChange={(value: "beginner" | "intermediate" | "expert") => 
+                          updateSkillLevel(skill.text, value)
+                        }
                       >
-                        + {skill}
+                        <SelectTrigger className="w-32">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {experienceLevels.map((level) => (
+                            <SelectItem key={level.value} value={level.value}>
+                              {level.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeSkill(skill.text)}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <X className="w-4 h-4" />
                       </Button>
-                    ))}
+                    </div>
                   </div>
-                </div>
-              )}
-
-              {/* Custom Skill */}
-              <div className="border-t pt-6">
-                <h3 className="font-semibold text-gray-900 mb-3">Add Custom Skill</h3>
-                <div className="flex space-x-3">
-                  <Input
-                    placeholder="Enter custom skill..."
-                    value={customSkill}
-                    onChange={(e) => setCustomSkill(e.target.value)}
-                    className="flex-1 h-12"
-                    onKeyPress={(e) => {
-                      if (e.key === "Enter") {
-                        addCustomSkill()
-                      }
-                    }}
-                  />
-                  <Select value={customSkillLevel} onValueChange={setCustomSkillLevel}>
-                    <SelectTrigger className="w-32 h-12">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {skillLevels.map((level) => (
-                        <SelectItem key={level.value} value={level.value}>
-                          {level.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button onClick={addCustomSkill} disabled={!customSkill.trim()} className="h-12 px-6">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add
-                  </Button>
-                </div>
+                ))}
               </div>
             </CardContent>
           </Card>
+        )}
 
-          <div className="flex justify-between pt-6">
-            <Button asChild variant="outline" className="flex items-center space-x-2 bg-transparent">
-              <Link href="/freelancer/onboarding/rates">
-                <ArrowLeft className="w-4 h-4" />
-                <span>Back</span>
-              </Link>
-            </Button>
+        {/* Skill Categories */}
+        <div className="space-y-6">
+          {Object.entries(skillCategories).map(([category, data]) => (
+            <Card key={category} className="border-0 shadow-lg">
+              <CardHeader className="pb-6">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2 bg-blue-100 rounded-lg text-blue-600">
+                    {data.icon}
+                  </div>
+                  <CardTitle className="text-xl text-gray-900">{category}</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {data.skills.map((skill) => {
+                    const isSelected = selectedSkills.some(s => s.text === skill)
+                    return (
+                      <Button
+                        key={skill}
+                        variant={isSelected ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => isSelected ? removeSkill(skill) : addSkill(skill, "intermediate")}
+                        className="justify-start text-sm h-10"
+                      >
+                        {skill}
+                      </Button>
+                    )
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
 
+        {/* Custom Skill */}
+        <Card className="border-0 shadow-lg">
+          <CardHeader className="pb-6">
+            <CardTitle className="text-xl text-gray-900">Add Custom Skill</CardTitle>
+            <p className="text-gray-600">Don't see your skill listed? Add it here</p>
+          </CardHeader>
+          <CardContent>
             <div className="flex space-x-3">
-              <Button variant="ghost" onClick={handleSkip} className="text-gray-600 hover:text-gray-900">
-                Skip for now
-              </Button>
-              <Button
-                onClick={handleNext}
-                disabled={selectedSkills.length < 3}
-                className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white flex items-center space-x-2"
-              >
-                <span>Continue</span>
-                <ArrowRight className="w-4 h-4" />
+              <div className="flex-1">
+                <Input
+                  placeholder="Enter a skill..."
+                  value={customSkill}
+                  onChange={(e) => setCustomSkill(e.target.value)}
+                  onKeyPress={(e) => {
+                    if (e.key === "Enter") {
+                      addCustomSkill()
+                    }
+                  }}
+                  className="h-12"
+                />
+              </div>
+              <Select value={customLevel} onValueChange={(value) => setCustomLevel(value as "beginner" | "intermediate" | "expert")}>
+                <SelectTrigger className="w-40 h-12">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {experienceLevels.map((level) => (
+                    <SelectItem key={level.value} value={level.value}>
+                      {level.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button onClick={addCustomSkill} className="h-12 px-6">
+                <Plus className="w-4 h-4 mr-2" />
+                Add
               </Button>
             </div>
+          </CardContent>
+        </Card>
+
+        <div className="flex justify-between pt-6">
+          <Button asChild variant="outline" className="flex items-center space-x-2 bg-transparent">
+            <Link href="/freelancer/onboarding/experience">
+              <ArrowLeft className="w-4 h-4" />
+              <span>Back</span>
+            </Link>
+          </Button>
+
+          <div className="flex space-x-3">
+            <Button 
+              variant="ghost" 
+              onClick={handleSkip} 
+              disabled={isSaving || isLoading}
+              className="text-gray-600 hover:text-gray-900"
+            >
+              {(isSaving || isLoading) ? "Saving..." : "Skip for now"}
+            </Button>
+            <Button
+              onClick={handleNext}
+              disabled={isSaving || isLoading}
+              className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white flex items-center space-x-2"
+            >
+              {(isSaving || isLoading) ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Saving...</span>
+                </>
+              ) : (
+                <>
+                  <span>Continue</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
+            </Button>
           </div>
         </div>
       </div>
