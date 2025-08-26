@@ -20,6 +20,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>
   signup: (userData: any) => Promise<void>
   logout: () => void
+  completeOnboarding: (userData?: Partial<User>) => void
   loading: boolean
 }
 
@@ -38,6 +39,56 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(JSON.parse(savedUser))
       } catch (error) {
         localStorage.removeItem("bizzlink_user")
+      }
+    } else {
+      // Check for onboarding user that needs to be promoted to full user
+      const onboardingData = localStorage.getItem('bizzlink_user_onboarding')
+      const signupData = localStorage.getItem('bizzlink_signup_progress')
+      
+      if (onboardingData) {
+        try {
+          const data = JSON.parse(onboardingData)
+          if (data.signupData && data.signupData.isComplete) {
+            // Create full user from onboarding data
+            const fullUser: User = {
+              userId: data.userId,
+              email: data.signupData.email,
+              firstName: data.signupData.firstname,
+              lastName: data.signupData.lastname,
+              displayName: `${data.signupData.firstname} ${data.signupData.lastname}`,
+              role: data.role,
+              photoURL: data.signupData.photoURL,
+              isVerified: false, // Will be verified through onboarding
+            }
+            
+            setUser(fullUser)
+            localStorage.setItem("bizzlink_user", JSON.stringify(fullUser))
+          }
+        } catch (error) {
+          console.error('Error promoting onboarding user:', error)
+        }
+      } else if (signupData) {
+        try {
+          const data = JSON.parse(signupData)
+          if (data.isComplete && data.fullUserId) {
+            // Create full user from signup data
+            const fullUser: User = {
+              userId: data.fullUserId,
+              email: data.email,
+              firstName: data.firstname,
+              lastName: data.lastname,
+              displayName: `${data.firstname} ${data.lastname}`,
+              role: data.userType,
+              photoURL: data.photoURL,
+              isVerified: false,
+            }
+            
+            setUser(fullUser)
+            localStorage.setItem("bizzlink_user", JSON.stringify(fullUser))
+          }
+        } catch (error) {
+          console.error('Error promoting signup user:', error)
+        }
       }
     }
     setLoading(false)
@@ -158,10 +209,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = () => {
     setUser(null)
     localStorage.removeItem("bizzlink_user")
+    localStorage.removeItem("bizzlink_signup_progress")
+    localStorage.removeItem("bizzlink_user_onboarding")
     router.push("/")
   }
 
-  return <AuthContext.Provider value={{ user, login, signup, logout, loading }}>{children}</AuthContext.Provider>
+  const completeOnboarding = (updatedUserData?: Partial<User>) => {
+    if (user && updatedUserData) {
+      const updatedUser = { ...user, ...updatedUserData, isVerified: true }
+      setUser(updatedUser)
+      localStorage.setItem("bizzlink_user", JSON.stringify(updatedUser))
+    }
+    
+    // Clear onboarding data
+    localStorage.removeItem("bizzlink_signup_progress")
+    localStorage.removeItem("bizzlink_user_onboarding")
+  }
+
+  return <AuthContext.Provider value={{ user, login, signup, logout, completeOnboarding, loading }}>{children}</AuthContext.Provider>
 }
 
 export function useAuth() {
