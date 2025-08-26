@@ -1,27 +1,29 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Navigation } from "@/components/navigation"
-import {
-  ArrowRight,
-  ArrowLeft,
-  Code,
-  Palette,
-  PenTool,
-  BarChart3,
-  Camera,
-  Megaphone,
-  Shield,
-  Smartphone,
-  Zap,
-} from "lucide-react"
+import { ArrowRight, ArrowLeft, Plus, Check, Loader2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { useOnboardingData } from "@/lib/redux/useOnboardingData"
+import { useToast } from "@/hooks/use-toast"
+
+import {
+  Code,
+  Smartphone,
+  Palette,
+  BarChart3,
+  Megaphone,
+  PenTool,
+  Camera,
+  Shield,
+  Globe,
+  Zap,
+} from "lucide-react"
 
 const specialties = [
   {
@@ -126,13 +128,40 @@ const specialties = [
 
 export default function SpecialtyPage() {
   const router = useRouter()
+  const { toast } = useToast()
+  const { 
+    onboardingData, 
+    saveSpecialties, 
+    saveRates,
+    isLoading, 
+    error,
+    hasData 
+  } = useOnboardingData()
+  
   const [selectedSpecialties, setSelectedSpecialties] = useState<string[]>([])
   const [selectedSubcategories, setSelectedSubcategories] = useState<string[]>([])
   const [customSpecialty, setCustomSpecialty] = useState("")
   const [professionalTitle, setProfessionalTitle] = useState("")
   const [overview, setOverview] = useState("")
+  const [isSaving, setIsSaving] = useState(false)
+  const [dataLoaded, setDataLoaded] = useState(false)
+
+  // Load existing data when component mounts - only once and not during save operations
+  useEffect(() => {
+    if (hasData && onboardingData && !dataLoaded && !isSaving) {
+      setSelectedSpecialties(onboardingData.specialties || [])
+      setProfessionalTitle(onboardingData.rates.title || "")
+      setOverview(onboardingData.rates.overview || "")
+      setDataLoaded(true)
+    }
+  }, [hasData, onboardingData, dataLoaded, isSaving])
 
   const toggleSpecialty = (specialtyId: string) => {
+    // Prevent toggle if we already have 3 specialties and this one isn't selected
+    if (selectedSpecialties.length >= 3 && !selectedSpecialties.includes(specialtyId)) {
+      return
+    }
+    
     setSelectedSpecialties((prev) =>
       prev.includes(specialtyId) ? prev.filter((id) => id !== specialtyId) : [...prev, specialtyId],
     )
@@ -150,17 +179,60 @@ export default function SpecialtyPage() {
       .flatMap((specialty) => specialty.subcategories)
   }
 
-  const handleNext = () => {
-    if (selectedSpecialties.length > 0 && professionalTitle) {
-      router.push("/freelancer/onboarding/education")
+  const handleNext = async () => {
+    if (selectedSpecialties.length === 0) {
+      toast({
+        title: "Please select at least one specialty",
+        description: "You need to choose your areas of expertise to continue.",
+        variant: "destructive"
+      })
+      return
+    }
+
+    if (!professionalTitle.trim()) {
+      toast({
+        title: "Professional title is required",
+        description: "Please add your professional title to continue.",
+        variant: "destructive"
+      })
+      return
+    }
+
+    try {
+      setIsSaving(true)
+      
+      // Combine selected specialties and subcategories
+      const allSpecialties = [...selectedSpecialties, ...selectedSubcategories]
+      if (customSpecialty.trim()) {
+        allSpecialties.push(customSpecialty.trim())
+      }
+
+      // Save to Firebase
+      const specialtiesSaved = await saveSpecialties(allSpecialties)
+      const ratesSaved = await saveRates("", professionalTitle.trim(), overview.trim())
+
+      if (specialtiesSaved && ratesSaved) {
+        toast({
+          title: "Progress saved!",
+          description: "Your specialty information has been saved successfully."
+        })
+        router.push("/freelancer/onboarding/education")
+      } else {
+        throw new Error("Failed to save data")
+      }
+    } catch (err: any) {
+      toast({
+        title: "Error saving data",
+        description: err.message || "Please try again.",
+        variant: "destructive"
+      })
+    } finally {
+      setIsSaving(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
-      <Navigation />
-
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Progress Bar */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
@@ -340,15 +412,23 @@ export default function SpecialtyPage() {
 
             <Button
               onClick={handleNext}
-              disabled={selectedSpecialties.length === 0 || !professionalTitle}
+              disabled={selectedSpecialties.length === 0 || !professionalTitle || isSaving || isLoading}
               className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white flex items-center space-x-2"
             >
-              <span>Continue</span>
-              <ArrowRight className="w-4 h-4" />
+              {(isSaving || isLoading) ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Saving...</span>
+                </>
+              ) : (
+                <>
+                  <span>Continue</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
             </Button>
           </div>
         </div>
       </div>
-    </div>
   )
 }
