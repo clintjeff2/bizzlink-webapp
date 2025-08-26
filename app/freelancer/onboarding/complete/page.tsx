@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Navigation } from "@/components/navigation"
 import { CheckCircle, Star, Trophy, Zap, ArrowRight, SnowflakeIcon as Confetti } from "lucide-react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
@@ -55,7 +54,6 @@ export default function CompletePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 relative overflow-hidden">
-      <Navigation />
 
       {/* Confetti Animation */}
       {showConfetti && (
