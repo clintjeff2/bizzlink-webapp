@@ -51,6 +51,77 @@ profile-pictures/
 **Max File Size**: 5MB
 **Auto-generated URLs**: Stored in user document `photoURL` field
 
+#### Usage Example
+```typescript
+// Upload profile image with automatic compression and multiple sizes
+import { uploadProfileImage } from '@/lib/services/storageService'
+
+const result = await uploadProfileImage(userId, file, (progress) => {
+  console.log(`Upload progress: ${progress}%`)
+})
+
+// Returns: { url: string, thumbnailUrl: string, mediumUrl: string, path: string }
+console.log(`Profile image uploaded: ${result.url}`)
+
+// Delete profile image
+import { deleteProfileImage } from '@/lib/services/storageService'
+await deleteProfileImage(userId, 'jpg')
+
+// Get existing profile image URL
+import { getProfileImageURL } from '@/lib/services/storageService'
+const imageUrl = await getProfileImageURL(userId, 'jpg')
+```
+
+### Project Requirements (`project-requirements/`)
+**Purpose**: Stores project requirement documents and attachments uploaded by clients.
+
+**Structure**:
+```
+project-requirements/
+├── {projectId}/
+│   ├── {fileId}_document.pdf        // Project requirement documents
+│   ├── {fileId}_mockup.png          // Design mockups
+│   ├── {fileId}_specification.doc   // Technical specifications
+│   └── {fileId}_reference.zip       // Reference materials
+```
+
+**File Naming Convention**:
+- Files: `project-requirements/{projectId}/{timestamp}_{index}_{sanitized_filename}`
+- Sanitized filename: Special characters replaced with underscores
+
+**Supported Formats**: PDF, DOC, DOCX, PNG, JPG, JPEG, GIF, ZIP, TXT
+**Max File Size**: 10MB per file
+**Max Files**: 5 files per project
+**Auto-generated URLs**: Stored in project document `requirements.attachments` array
+
+#### Usage Example
+```typescript
+// Upload project requirement files
+import { uploadProjectRequirementFiles } from '@/lib/services/storageService'
+
+const uploadResults = await uploadProjectRequirementFiles(
+  projectId,
+  files, // Array of File objects
+  (progress, fileName) => {
+    console.log(`Upload progress for ${fileName}: ${progress}%`)
+  }
+)
+
+// Returns array of file metadata
+uploadResults.forEach(result => {
+  console.log(`Uploaded: ${result.fileName} -> ${result.fileUrl}`)
+})
+
+// File metadata structure stored in project.requirements.attachments:
+interface ProjectAttachment {
+  fileName: string;    // Original filename (e.g., "requirements.pdf")
+  fileUrl: string;     // Firebase Storage download URL
+  fileType: string;    // MIME type (e.g., "application/pdf")
+  uploadedAt: string;  // ISO timestamp when uploaded
+}
+```
+
+
 ## Data Types & Conventions
 
 ### Naming Conventions
@@ -92,6 +163,8 @@ interface User {
   photoURL: string;                  // Profile image URL
   isActive: boolean;
   isVerified: boolean;               // Identity verification
+  paymentVerified: boolean;          // Payment method verification
+  phoneVerified: boolean;            // Phone number verification
   accountStatus: "active" | "suspended" | "pending";
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -117,6 +190,12 @@ interface User {
     additionalLanguages: string[];   // Additional languages spoken
     timezone: string;                // User's timezone (e.g., "UTC-05:00 (Eastern Time)")
     dateOfBirth: string;             // Date of birth (ISO date)
+    
+    // Client-specific Company Information
+    companyName: string;             // Company name for clients
+    industry: string;                // Industry/sector for clients
+    companySize: string;             // Company size (e.g., "1-10 employees")
+    companyDescription: string;      // Company description for clients
   };
   
   // Professional Info (for service providers)
@@ -148,6 +227,17 @@ interface User {
     startDate: string;
     endDate: string;                 // "Present" for current
     description: string;
+    current: boolean;                // true if currently employed here
+  }>;
+  
+  certifications: Array<{
+    id: number;
+    name: string;                    // Certificate name
+    issuer: string;                  // Issuing organization
+    issueDate: string;              // Date issued (YYYY-MM format)
+    expirationDate: string;         // Expiration date (YYYY-MM format, optional)
+    credentialId: string;           // Credential ID or license number
+    credentialUrl: string;          // URL to verify credential (optional)
   }>;
   
   portfolio: Array<{
@@ -175,6 +265,8 @@ interface User {
     totalReviews: number;
     responseRate: number;
     onTimeDelivery: number;
+    repeatClients: number;
+    hirRate: number;                 // For clients - hire rate percentage
   };
   
   // Preferences
@@ -223,8 +315,8 @@ interface Project {
   
   timeline: {
     duration: string;                // "1 week", "2 months", etc.
-    startDate: Timestamp;
-    endDate: Timestamp;
+    startDate: string;               // ISO string (serialized for Redux)
+    endDate: string;                 // ISO string (serialized for Redux)
     isUrgent: boolean;
   };
   
@@ -237,7 +329,7 @@ interface Project {
       fileName: string;
       fileUrl: string;
       fileType: string;
-      uploadedAt: Timestamp;
+      uploadedAt: string;            // ISO string (serialized for Redux)
     }>;
   };
   
@@ -251,15 +343,15 @@ interface Project {
     title: string;
     description: string;
     amount: number;
-    dueDate: Timestamp;
+    dueDate: string;                 // ISO string (serialized for Redux)
     status: "pending" | "in_progress" | "completed" | "approved";
     deliverables: string[];
   }>;
   
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
-  publishedAt: Timestamp;
-  closedAt: Timestamp;
+  createdAt: string;                 // ISO string (serialized for Redux)
+  updatedAt: string;                 // ISO string (serialized for Redux)
+  publishedAt: string | null;        // ISO string (serialized for Redux)
+  closedAt: string | null;           // ISO string (serialized for Redux)
 }
 ```
 
@@ -268,6 +360,7 @@ interface Project {
 - Milestone-based project structure
 - Rich requirements specification
 - Client information embedding for quick access
+- **Date Serialization**: All timestamp fields are stored as Firestore Timestamp objects in the database but automatically converted to ISO strings when stored in Redux state to maintain serializability
 
 ### 3. Proposals Collection (`proposals/{proposalId}`)
 
@@ -653,6 +746,24 @@ useUpdateUserLocationAndProfileMutation({
 })
 ```
 
+## Firebase Timestamp Serialization
+
+**Important Note**: To ensure compatibility with Redux (which requires serializable data), all Firestore Timestamp objects are automatically converted to ISO string format when retrieved from the database and converted back to Timestamps when saving to Firestore.
+
+### Data Flow
+1. **Frontend → API**: Data with string dates (ISO format)
+2. **API → Firestore**: Automatically converted to Timestamp objects
+3. **Firestore → API**: Timestamp objects from database
+4. **API → Redux**: Automatically serialized to ISO strings
+
+### Affected Fields
+- `Project.timeline.startDate` and `endDate`
+- `Project.createdAt`, `updatedAt`, `publishedAt`, `closedAt`
+- `ProjectMilestone.dueDate`
+- All other timestamp fields across collections
+
+This ensures Redux compatibility while maintaining proper Firestore Timestamp functionality.
+
 ## Version Control
 
 ### Schema Updates
@@ -662,14 +773,29 @@ useUpdateUserLocationAndProfileMutation({
 - Version the schema documentation
 
 ### Change Log
+
+#### Version 1.0.1 (August 28, 2025)
+- **Added** `paymentVerified` field to User interface for payment method verification
+- **Added** `phoneVerified` field to User interface for phone number verification  
+- **Added** `hirRate` field to UserStats interface for client hire rate percentage
+- **Added** client-specific company fields to UserAboutInfo interface:
+  - `companyName` - Company name for clients
+  - `industry` - Industry/sector for clients  
+  - `companySize` - Company size (e.g., "1-10 employees")
+  - `companyDescription` - Company description for clients
+- **Updated** User interface documentation to reflect verification fields
+- **Updated** UserStats interface to include hirRate for client metrics
+
+#### Version 1.0.0 (August 26, 2025)
+- Initial schema documentation
 - Track all modifications with timestamps
 - Document the reasoning behind changes
 - Maintain migration paths for existing data
 
 ---
 
-**Last Updated**: August 26, 2025  
-**Version**: 1.0.0  
+**Last Updated**: August 28, 2025  
+**Version**: 1.0.1  
 **Maintained by**: Bizzlink Development Team
 
 For questions or suggestions regarding this schema, please contact the development team.
