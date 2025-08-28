@@ -8,6 +8,15 @@ export interface ImageUploadResult {
   path: string
 }
 
+export interface FileUploadResult {
+  fileName: string
+  fileUrl: string
+  fileType: string
+  uploadedAt: string
+  path: string
+  size: number
+}
+
 /**
  * Upload a profile image to Firebase Storage
  * Creates multiple sizes: original, medium (400x400), thumbnail (150x150)
@@ -98,6 +107,101 @@ export function fileToBase64(file: File): Promise<string> {
     reader.onload = () => resolve(reader.result as string)
     reader.onerror = error => reject(error)
   })
+}
+
+/**
+ * Upload project requirement files to Firebase Storage
+ * Stores files in project-requirements/{projectId}/ bucket
+ */
+export async function uploadProjectRequirementFiles(
+  projectId: string,
+  files: File[],
+  onProgress?: (progress: number, fileName: string) => void
+): Promise<FileUploadResult[]> {
+  try {
+    if (!files || files.length === 0) {
+      return []
+    }
+
+    // Validate files
+    const maxFileSize = 10 * 1024 * 1024 // 10MB limit
+    const allowedTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'image/png',
+      'image/jpeg',
+      'image/gif',
+      'application/zip',
+      'text/plain'
+    ]
+
+    for (const file of files) {
+      if (file.size > maxFileSize) {
+        throw new Error(`File ${file.name} exceeds 10MB limit`)
+      }
+      if (!allowedTypes.includes(file.type)) {
+        throw new Error(`File type ${file.type} is not allowed for ${file.name}`)
+      }
+    }
+
+    const uploadResults: FileUploadResult[] = []
+    const totalFiles = files.length
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]
+      const fileId = `${Date.now()}_${i}`
+      const fileExtension = file.name.split('.').pop()?.toLowerCase() || 'bin'
+      const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+      
+      // Create storage reference
+      const fileRef = ref(storage, `project-requirements/${projectId}/${fileId}_${sanitizedFileName}`)
+      
+      // Upload file
+      onProgress?.((i / totalFiles) * 50, file.name)
+      
+      const uploadResult = await uploadBytes(fileRef, file)
+      
+      onProgress?.(((i + 0.5) / totalFiles) * 100, file.name)
+      
+      // Get download URL
+      const downloadURL = await getDownloadURL(uploadResult.ref)
+      
+      onProgress?.(((i + 1) / totalFiles) * 100, file.name)
+      
+      uploadResults.push({
+        fileName: file.name,
+        fileUrl: downloadURL,
+        fileType: file.type,
+        uploadedAt: new Date().toISOString(),
+        path: uploadResult.ref.fullPath,
+        size: file.size
+      })
+    }
+
+    return uploadResults
+    
+  } catch (error) {
+    console.error('Error uploading project requirement files:', error)
+    throw error
+  }
+}
+
+/**
+ * Delete project requirement files from Firebase Storage
+ */
+export async function deleteProjectRequirementFiles(filePaths: string[]): Promise<void> {
+  try {
+    const deletePromises = filePaths.map(path => {
+      const fileRef = ref(storage, path)
+      return deleteObject(fileRef)
+    })
+    
+    await Promise.all(deletePromises)
+  } catch (error) {
+    console.error('Error deleting project requirement files:', error)
+    throw error
+  }
 }
 
 /**
