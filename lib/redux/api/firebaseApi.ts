@@ -58,7 +58,12 @@ import type {
   MessageQueryParams,
   ConversationQueryParams,
   PaginatedResponse,
-  ApiResponse
+  ApiResponse,
+  UserEducation,
+  UserEmployment,
+  UserPortfolio,
+  UserSkill,
+  UserCertification
 } from '../types/firebaseTypes'
 
 // Helper function to convert Firestore timestamps to serializable strings
@@ -69,6 +74,109 @@ const serializeUser = (user: any): User => {
     updatedAt: user.updatedAt instanceof Timestamp ? user.updatedAt.toDate().toISOString() : user.updatedAt,
     lastLoginAt: user.lastLoginAt instanceof Timestamp ? user.lastLoginAt.toDate().toISOString() : user.lastLoginAt,
   }
+}
+
+// Helper function to convert Firestore timestamps in projects to serializable strings
+const serializeProject = (project: any): Project => {
+  return {
+    ...project,
+    createdAt: project.createdAt instanceof Timestamp ? project.createdAt.toDate().toISOString() : project.createdAt,
+    updatedAt: project.updatedAt instanceof Timestamp ? project.updatedAt.toDate().toISOString() : project.updatedAt,
+    publishedAt: project.publishedAt instanceof Timestamp ? project.publishedAt.toDate().toISOString() : project.publishedAt,
+    closedAt: project.closedAt instanceof Timestamp ? project.closedAt.toDate().toISOString() : project.closedAt,
+    timeline: {
+      ...project.timeline,
+      startDate: project.timeline?.startDate instanceof Timestamp 
+        ? project.timeline.startDate.toDate().toISOString() 
+        : project.timeline?.startDate instanceof Date
+        ? project.timeline.startDate.toISOString()
+        : project.timeline?.startDate,
+      endDate: project.timeline?.endDate instanceof Timestamp 
+        ? project.timeline.endDate.toDate().toISOString() 
+        : project.timeline?.endDate instanceof Date
+        ? project.timeline.endDate.toISOString()
+        : project.timeline?.endDate,
+    },
+    milestones: project.milestones?.map((milestone: any) => ({
+      ...milestone,
+      dueDate: milestone.dueDate instanceof Timestamp 
+        ? milestone.dueDate.toDate().toISOString() 
+        : milestone.dueDate instanceof Date
+        ? milestone.dueDate.toISOString()
+        : milestone.dueDate,
+    })) || [],
+    requirements: {
+      ...project.requirements,
+      attachments: project.requirements?.attachments?.map((attachment: any) => ({
+        ...attachment,
+        uploadedAt: attachment.uploadedAt instanceof Timestamp
+          ? attachment.uploadedAt.toDate().toISOString()
+          : attachment.uploadedAt instanceof Date
+          ? attachment.uploadedAt.toISOString()
+          : attachment.uploadedAt,
+      })) || [],
+    },
+  }
+}
+
+// Helper function to convert string dates to Timestamps for Firestore storage
+const deserializeProjectForStorage = (project: any): any => {
+  console.log('🔧 Deserializing project for storage:', project)
+  const result = { ...project }
+  
+  // Convert timeline dates to Timestamps if they're strings or Date objects
+  if (result.timeline) {
+    console.log('🔧 Timeline before conversion:', result.timeline)
+    
+    if (typeof result.timeline.startDate === 'string') {
+      console.log('🔧 Converting string startDate to Timestamp')
+      result.timeline.startDate = Timestamp.fromDate(new Date(result.timeline.startDate))
+    } else if (result.timeline.startDate instanceof Date) {
+      console.log('🔧 Converting Date startDate to Timestamp')
+      result.timeline.startDate = Timestamp.fromDate(result.timeline.startDate)
+    } else {
+      console.log('🔧 StartDate is already a Timestamp or other type:', typeof result.timeline.startDate)
+    }
+    
+    if (typeof result.timeline.endDate === 'string') {
+      console.log('🔧 Converting string endDate to Timestamp')
+      result.timeline.endDate = Timestamp.fromDate(new Date(result.timeline.endDate))
+    } else if (result.timeline.endDate instanceof Date) {
+      console.log('🔧 Converting Date endDate to Timestamp')
+      result.timeline.endDate = Timestamp.fromDate(result.timeline.endDate)
+    } else {
+      console.log('🔧 EndDate is already a Timestamp or other type:', typeof result.timeline.endDate)
+    }
+    
+    console.log('🔧 Timeline after conversion:', result.timeline)
+  }
+  
+  // Convert milestone dates to Timestamps
+  if (result.milestones) {
+    result.milestones = result.milestones.map((milestone: any) => ({
+      ...milestone,
+      dueDate: typeof milestone.dueDate === 'string' 
+        ? Timestamp.fromDate(new Date(milestone.dueDate))
+        : milestone.dueDate instanceof Date
+        ? Timestamp.fromDate(milestone.dueDate)
+        : milestone.dueDate,
+    }))
+  }
+  
+  // Convert attachment dates to Timestamps
+  if (result.requirements?.attachments) {
+    result.requirements.attachments = result.requirements.attachments.map((attachment: any) => ({
+      ...attachment,
+      uploadedAt: typeof attachment.uploadedAt === 'string'
+        ? Timestamp.fromDate(new Date(attachment.uploadedAt))
+        : attachment.uploadedAt instanceof Date
+        ? Timestamp.fromDate(attachment.uploadedAt)
+        : attachment.uploadedAt,
+    }))
+  }
+  
+  console.log('🔧 Result after deserialization:', result)
+  return result
 }
 
 // Create Firebase API using RTK Query with fakeBaseQuery
@@ -164,7 +272,8 @@ export const firebaseApi = createApi({
               averageRating: 0,
               totalReviews: 0,
               responseRate: 0,
-              onTimeDelivery: 0
+              onTimeDelivery: 0,
+              repeatClients: 0
             },
             preferences: {
               timezone: 'UTC',
@@ -260,7 +369,8 @@ export const firebaseApi = createApi({
                 averageRating: 0,
                 totalReviews: 0,
                 responseRate: 0,
-                onTimeDelivery: 0
+                onTimeDelivery: 0,
+              repeatClients: 0
               },
               preferences: {
                 timezone: 'UTC',
@@ -407,10 +517,13 @@ export const firebaseApi = createApi({
           const querySnapshot = await getDocs(q)
           const projects = querySnapshot.docs.map(doc => {
             const data = doc.data()
-            return {
+            const project = {
               projectId: doc.id,
               ...data
             } as Project
+            
+            // Serialize each project before returning to Redux
+            return serializeProject(project)
           })
           
           return { data: projects }
@@ -434,7 +547,9 @@ export const firebaseApi = createApi({
             projectId: projectDoc.id,
             ...data
           } as Project
-          return { data: project }
+          
+          // Serialize the project before returning it to Redux
+          return { data: serializeProject(project) }
         } catch (error: any) {
           return { error: { status: 'CUSTOM_ERROR', error: error.message } }
         }
@@ -442,20 +557,193 @@ export const firebaseApi = createApi({
       providesTags: ['Project'],
     }),
 
-    createProject: builder.mutation<Project, Omit<Project, 'projectId' | 'createdAt' | 'updatedAt'>>({
+    getProjectsByClient: builder.query<Project[], { 
+      clientId: string;
+      status?: string;
+      limit?: number;
+    }>({
+      queryFn: async ({ clientId, status, limit: queryLimit = 50 }) => {
+        try {
+          console.log("=== FIREBASE getProjectsByClient QUERY ===")
+          console.log("1. Input parameters:", { clientId, status, limit: queryLimit })
+          console.log("2. Client ID type:", typeof clientId)
+          console.log("3. Client ID length:", clientId?.length)
+          console.log("4. Client ID value:", `'${clientId}'`)
+          
+          let q = query(
+            collection(db, 'projects'),
+            where('clientId', '==', clientId),
+            limit(queryLimit)
+          )
+          
+          if (status) {
+            q = query(
+              collection(db, 'projects'),
+              where('clientId', '==', clientId),
+              where('status', '==', status),
+              limit(queryLimit)
+            )
+            console.log("5. Added status filter:", status)
+          }
+          
+          console.log("6. Executing Firestore query...")
+          const querySnapshot = await getDocs(q)
+          console.log("7. Query snapshot size:", querySnapshot.size)
+          console.log("8. Query snapshot empty:", querySnapshot.empty)
+          
+          const projects = querySnapshot.docs.map((doc, index) => {
+            const data = doc.data()
+            console.log(`9.${index + 1}. Project data:`, { 
+              id: doc.id, 
+              clientId: data.clientId,
+              title: data.title,
+              status: data.status,
+              createdAt: data.createdAt 
+            })
+            const project = {
+              projectId: doc.id,
+              ...data
+            } as Project
+            
+            // Serialize each project before returning to Redux
+            return serializeProject(project)
+          })
+          
+          // Sort by createdAt in memory (most recent first)
+          projects.sort((a, b) => {
+            const aTime = a.createdAt?.seconds || 0
+            const bTime = b.createdAt?.seconds || 0
+            return bTime - aTime
+          })
+          
+          console.log("10. Total projects found:", projects.length)
+          console.log("11. Returning projects to Redux")
+          console.log("========================================")
+          return { data: projects }
+        } catch (error: any) {
+          console.error("=== FIREBASE QUERY ERROR ===")
+          console.error("Error details:", error)
+          console.error("Error message:", error.message)
+          console.error("Error code:", error.code)
+          console.error("============================")
+          return { error: { status: 'CUSTOM_ERROR', error: error.message } }
+        }
+      },
+      providesTags: ['Project'],
+    }),
+
+    createProject: builder.mutation<Project, Omit<Project, 'projectId' | 'createdAt' | 'updatedAt' | 'publishedAt' | 'closedAt'>>({
       queryFn: async (projectData) => {
         try {
+          console.log('🚀 CreateProject - Original data:', projectData)
+          console.log('🚀 Timeline startDate type:', typeof projectData.timeline?.startDate, projectData.timeline?.startDate)
+          console.log('🚀 Timeline endDate type:', typeof projectData.timeline?.endDate, projectData.timeline?.endDate)
+          
           const docRef = doc(collection(db, 'projects'))
+          const now = Timestamp.now()
+          
+          // Deserialize string dates to Timestamps for Firestore storage
+          const deserializedProjectData = deserializeProjectForStorage(projectData)
+          console.log('🚀 After deserialization:', deserializedProjectData)
+          
           const newProject = {
-            ...projectData,
+            ...deserializedProjectData,
             projectId: docRef.id,
-            createdAt: Timestamp.now(),
-            updatedAt: Timestamp.now(),
+            createdAt: now,
+            updatedAt: now,
+            publishedAt: projectData.status === 'active' ? now : null,
+            closedAt: null,
           }
           
           await setDoc(docRef, newProject)
           
-          return { data: newProject }
+          // Serialize the project before returning it to Redux
+          const serializedProject = serializeProject(newProject)
+          console.log('🚀 After serialization:', serializedProject)
+          console.log('🚀 Timeline startDate after serialization:', typeof serializedProject.timeline?.startDate, serializedProject.timeline?.startDate)
+          
+          return { data: serializedProject }
+        } catch (error: any) {
+          console.error('🚀 CreateProject error:', error)
+          return { error: { status: 'CUSTOM_ERROR', error: error.message } }
+        }
+      },
+      invalidatesTags: ['Project'],
+    }),
+
+    updateProject: builder.mutation<Project, { projectId: string; updateData: Partial<Project> }>({
+      queryFn: async ({ projectId, updateData }) => {
+        try {
+          const projectRef = doc(db, 'projects', projectId)
+          
+          // Deserialize string dates to Timestamps for Firestore storage
+          const deserializedUpdateData = deserializeProjectForStorage(updateData)
+          
+          const updateDataWithTimestamp = {
+            ...deserializedUpdateData,
+            updatedAt: Timestamp.now(),
+            // Set publishedAt if status is being changed to active
+            ...(updateData.status === 'active' && !updateData.publishedAt && { publishedAt: Timestamp.now() }),
+            // Set closedAt if status is being changed to completed or cancelled
+            ...((['completed', 'cancelled'].includes(updateData.status as string)) && { closedAt: Timestamp.now() })
+          }
+          
+          await updateDoc(projectRef, updateDataWithTimestamp)
+          
+          const updatedDoc = await getDoc(projectRef)
+          const docData = updatedDoc.data()
+          const project = {
+            projectId: updatedDoc.id,
+            ...docData
+          } as Project
+          
+          // Serialize the project before returning it to Redux
+          return { data: serializeProject(project) }
+        } catch (error: any) {
+          return { error: { status: 'CUSTOM_ERROR', error: error.message } }
+        }
+      },
+      invalidatesTags: ['Project'],
+    }),
+
+    saveProjectDraft: builder.mutation<{ success: boolean; projectId?: string }, {
+      projectData: Partial<Project>;
+      isDraft: boolean;
+    }>({
+      queryFn: async ({ projectData, isDraft }) => {
+        try {
+          let docRef: any
+          
+          if (projectData.projectId) {
+            // Update existing draft
+            docRef = doc(db, 'projects', projectData.projectId)
+            await updateDoc(docRef, {
+              ...projectData,
+              status: isDraft ? 'draft' : 'active',
+              updatedAt: Timestamp.now(),
+              ...((!isDraft && !projectData.publishedAt) && { publishedAt: Timestamp.now() })
+            })
+          } else {
+            // Create new draft
+            docRef = doc(collection(db, 'projects'))
+            const now = Timestamp.now()
+            await setDoc(docRef, {
+              ...projectData,
+              projectId: docRef.id,
+              status: isDraft ? 'draft' : 'active',
+              createdAt: now,
+              updatedAt: now,
+              publishedAt: isDraft ? null : now,
+              closedAt: null,
+            })
+          }
+          
+          return { 
+            data: { 
+              success: true, 
+              projectId: docRef.id 
+            } 
+          }
         } catch (error: any) {
           return { error: { status: 'CUSTOM_ERROR', error: error.message } }
         }
@@ -718,7 +1006,8 @@ export const firebaseApi = createApi({
               averageRating: 0,
               totalReviews: 0,
               responseRate: 0,
-              onTimeDelivery: 0
+              onTimeDelivery: 0,
+              repeatClients: 0
             },
             preferences: {
               timezone: 'UTC',
@@ -827,7 +1116,8 @@ export const firebaseApi = createApi({
                 averageRating: 0,
                 totalReviews: 0,
                 responseRate: 0,
-                onTimeDelivery: 0
+                onTimeDelivery: 0,
+              repeatClients: 0
               },
               preferences: {
                 timezone: 'UTC',
@@ -912,7 +1202,7 @@ export const firebaseApi = createApi({
             throw new Error('User not found')
           }
           
-          return { data: { data: serializeUser({ userId, ...updatedUser.data() }), message: 'Education updated successfully' } }
+          return { data: { data: serializeUser({ userId, ...updatedUser.data() }), success: true, message: 'Education updated successfully' } }
         } catch (error: any) {
           return { error: { status: 'CUSTOM_ERROR', error: error.message } }
         }
@@ -934,7 +1224,7 @@ export const firebaseApi = createApi({
             throw new Error('User not found')
           }
           
-          return { data: { data: serializeUser({ userId, ...updatedUser.data() }), message: 'Portfolio updated successfully' } }
+          return { data: { data: serializeUser({ userId, ...updatedUser.data() }), success: true, message: 'Portfolio updated successfully' } }
         } catch (error: any) {
           return { error: { status: 'CUSTOM_ERROR', error: error.message } }
         }
@@ -956,7 +1246,7 @@ export const firebaseApi = createApi({
             throw new Error('User not found')
           }
           
-          return { data: { data: serializeUser({ userId, ...updatedUser.data() }), message: 'Employment updated successfully' } }
+          return { data: { data: serializeUser({ userId, ...updatedUser.data() }), success: true, message: 'Employment updated successfully' } }
         } catch (error: any) {
           return { error: { status: 'CUSTOM_ERROR', error: error.message } }
         }
@@ -978,7 +1268,29 @@ export const firebaseApi = createApi({
             throw new Error('User not found')
           }
           
-          return { data: { data: serializeUser({ userId, ...updatedUser.data() }), message: 'Skills updated successfully' } }
+          return { data: { data: serializeUser({ userId, ...updatedUser.data() }), success: true, message: 'Skills updated successfully' } }
+        } catch (error: any) {
+          return { error: { status: 'CUSTOM_ERROR', error: error.message } }
+        }
+      },
+      invalidatesTags: ['User'],
+    }),
+
+    updateUserCertifications: builder.mutation<ApiResponse<User>, { userId: string; certifications: UserCertification[] }>({
+      queryFn: async ({ userId, certifications }) => {
+        try {
+          const userRef = doc(db, 'users', userId)
+          await updateDoc(userRef, { 
+            certifications,
+            updatedAt: Timestamp.now()
+          })
+          
+          const updatedUser = await getDoc(userRef)
+          if (!updatedUser.exists()) {
+            throw new Error('User not found')
+          }
+          
+          return { data: { data: serializeUser({ userId, ...updatedUser.data() }), success: true, message: 'Certifications updated successfully' } }
         } catch (error: any) {
           return { error: { status: 'CUSTOM_ERROR', error: error.message } }
         }
@@ -1002,7 +1314,7 @@ export const firebaseApi = createApi({
             throw new Error('User not found')
           }
           
-          return { data: { data: serializeUser({ userId, ...updatedUser.data() }), message: 'Profile updated successfully' } }
+          return { data: { data: serializeUser({ userId, ...updatedUser.data() }), success: true, message: 'Profile updated successfully' } }
         } catch (error: any) {
           return { error: { status: 'CUSTOM_ERROR', error: error.message } }
         }
@@ -1076,7 +1388,7 @@ export const firebaseApi = createApi({
             throw new Error('User not found')
           }
           
-          return { data: { data: serializeUser({ userId, ...updatedUser.data() }), message: 'Location and profile updated successfully' } }
+          return { data: { data: serializeUser({ userId, ...updatedUser.data() }), success: true, message: 'Location and profile updated successfully' } }
         } catch (error: any) {
           return { error: { status: 'CUSTOM_ERROR', error: error.message } }
         }
@@ -1165,7 +1477,9 @@ export const {
   useResetPasswordMutation,
   useGetProjectsQuery,
   useGetProjectQuery,
+  useGetProjectsByClientQuery,
   useCreateProjectMutation,
+  useUpdateProjectMutation,
   useGetProposalsQuery,
   useCreateProposalMutation,
   useUpdateProposalMutation,
@@ -1181,6 +1495,7 @@ export const {
   useUpdateUserPortfolioMutation,
   useUpdateUserEmploymentMutation,
   useUpdateUserSkillsMutation,
+  useUpdateUserCertificationsMutation,
   useUpdateUserRatesMutation,
   useUpdateUserLocationAndProfileMutation,
   useGetUserOnboardingDataQuery,
