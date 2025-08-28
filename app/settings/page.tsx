@@ -11,19 +11,20 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Navigation } from "@/components/navigation"
-import { useAuth } from "@/components/auth-provider"
+import { useSelector } from "react-redux"
+import { RootState } from "@/lib/redux/store"
 import { useTheme } from "next-themes"
 import { Settings, User, Bell, Shield, CreditCard, Palette, Camera, Save, Eye } from "lucide-react"
 
 export default function SettingsPage() {
-  const { user } = useAuth()
+  const { user } = useSelector((state: RootState) => state.auth)
   const { theme, setTheme } = useTheme()
   const [activeTab, setActiveTab] = useState("profile")
 
   // Profile settings
   const [profileData, setProfileData] = useState({
-    firstName: user?.firstName || "",
-    lastName: user?.lastName || "",
+    firstName: user?.firstname || "",
+    lastName: user?.lastname || "",
     email: user?.email || "",
     phone: "",
     bio: "",
@@ -105,8 +106,8 @@ export default function SettingsPage() {
                 <div className="flex items-center space-x-6">
                   <div className="relative">
                     <div className="w-24 h-24 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-2xl font-bold">
-                      {user?.firstName?.[0]}
-                      {user?.lastName?.[0]}
+                      {user?.firstname?.[0]}
+                      {user?.lastname?.[0]}
                     </div>
                     <Button size="sm" className="absolute -bottom-2 -right-2 rounded-full w-8 h-8 p-0">
                       <Camera className="w-4 h-4" />
