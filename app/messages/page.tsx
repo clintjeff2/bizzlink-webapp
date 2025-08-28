@@ -166,7 +166,7 @@ export default function MessagesPage() {
                           alt={conversation.name}
                           width={40}
                           height={40}
-                          className="w-10 h-10 rounded-full"
+                          className="w-10 h-10 rounded-full object-cover"
                         />
                         {conversation.online && (
                           <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
@@ -208,7 +208,7 @@ export default function MessagesPage() {
                           alt={selectedConversation.name}
                           width={40}
                           height={40}
-                          className="w-10 h-10 rounded-full"
+                          className="w-10 h-10 rounded-full object-cover"
                         />
                         {selectedConversation.online && (
                           <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
@@ -250,7 +250,7 @@ export default function MessagesPage() {
                           alt={message.sender}
                           width={32}
                           height={32}
-                          className="w-8 h-8 rounded-full"
+                          className="w-8 h-8 rounded-full object-cover"
                         />
                         <div
                           className={`rounded-2xl px-4 py-2 ${
