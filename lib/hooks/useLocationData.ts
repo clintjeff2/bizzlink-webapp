@@ -1,7 +1,10 @@
 import { useUpdateUserLocationAndProfileMutation } from '@/lib/redux/api/firebaseApi'
 import { uploadProfileImage } from '@/lib/services/storageService'
 import { useToast } from '@/hooks/use-toast'
-import { useAuth } from '@/components/auth-provider'
+import { useState, useEffect } from 'react'
+import { doc, updateDoc } from 'firebase/firestore'
+import { db } from '../../firebase'
+import { useAuth } from '@/components/auth-provider-redux'
 
 export interface LocationData {
   country: string
