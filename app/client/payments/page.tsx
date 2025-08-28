@@ -412,7 +412,7 @@ export default function ClientPayments() {
                             alt={payment.freelancer.name}
                             width={32}
                             height={32}
-                            className="w-8 h-8 rounded-full"
+                            className="w-8 h-8 rounded-full object-cover"
                           />
                           <div>
                             <p className="font-medium text-gray-900 dark:text-white text-sm">{payment.projectTitle}</p>
