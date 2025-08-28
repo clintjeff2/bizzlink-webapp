@@ -2,7 +2,7 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
-import { AuthProvider } from "@/components/auth-provider"
+import { AuthProviderRedux } from "@/components/auth-provider-redux"
 import { ThemeProvider } from "@/components/theme-provider"
 import { ReduxProvider } from "@/lib/redux"
 
@@ -27,7 +27,7 @@ export default function RootLayout({
       <body className={`${inter.variable} font-sans`}>
         <ReduxProvider>
           <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
-            <AuthProvider>{children}</AuthProvider>
+            <AuthProviderRedux>{children}</AuthProviderRedux>
           </ThemeProvider>
         </ReduxProvider>
       </body>
