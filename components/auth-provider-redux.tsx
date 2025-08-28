@@ -7,13 +7,14 @@ import { onAuthStateChanged } from 'firebase/auth'
 import { auth } from '../firebase'
 import { useAppDispatch, useAppSelector, setUser, setLoading, User } from '@/lib/redux'
 import { getUserData } from '@/lib/redux/utils'
+import { useLogoutMutation } from '@/lib/redux/api/firebaseApi'
 
 interface AuthContextType {
   // Keep the same interface for backward compatibility
   user: User | null
   login: (email: string, password: string) => Promise<void>
   signup: (userData: any) => Promise<void>
-  logout: () => void
+  logout: () => Promise<void>
   loading: boolean
 }
 
@@ -23,6 +24,7 @@ export function AuthProviderRedux({ children }: { children: React.ReactNode }) {
   const dispatch = useAppDispatch()
   const { user, loading } = useAppSelector((state) => state.auth)
   const router = useRouter()
+  const [logoutMutation] = useLogoutMutation()
 
   useEffect(() => {
     dispatch(setLoading(true))
@@ -55,9 +57,14 @@ export function AuthProviderRedux({ children }: { children: React.ReactNode }) {
     throw new Error('Use useSignupMutation from Redux instead')
   }
 
-  const logout = () => {
-    // This will be handled by RTK Query mutations
-    throw new Error('Use useLogoutMutation from Redux instead')
+  const logout = async () => {
+    try {
+      await logoutMutation().unwrap()
+      // Redirect to home page after logout
+      router.push('/')
+    } catch (error) {
+      console.error('Logout failed:', error)
+    }
   }
 
   return (
