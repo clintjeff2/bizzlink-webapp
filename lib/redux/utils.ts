@@ -16,7 +16,21 @@ export const getUserData = async (uid: string): Promise<User | null> => {
   try {
     const userDoc = await getDoc(doc(db, 'users', uid))
     if (userDoc.exists()) {
-      return userDoc.data() as User
+      const userData = userDoc.data()
+      
+      // Convert Firebase Timestamps to ISO strings to prevent Redux serialization warnings
+      return {
+        ...userData,
+        createdAt: userData.createdAt?.seconds ? 
+          new Date(userData.createdAt.seconds * 1000).toISOString() : 
+          userData.createdAt,
+        updatedAt: userData.updatedAt?.seconds ? 
+          new Date(userData.updatedAt.seconds * 1000).toISOString() : 
+          userData.updatedAt,
+        lastLoginAt: userData.lastLoginAt?.seconds ? 
+          new Date(userData.lastLoginAt.seconds * 1000).toISOString() : 
+          userData.lastLoginAt
+      } as User
     }
     return null
   } catch (error) {
