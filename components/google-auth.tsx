@@ -2,7 +2,8 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { useAuth } from "@/components/auth-provider"
+import { useRouter } from "next/navigation"
+import { useGoogleAuthMutation } from "@/lib/redux/api/firebaseApi"
 
 interface GoogleAuthProps {
   mode: "login" | "signup"
@@ -11,22 +12,26 @@ interface GoogleAuthProps {
 
 export function GoogleAuth({ mode, className }: GoogleAuthProps) {
   const [isLoading, setIsLoading] = useState(false)
-  const { loginWithGoogle, signupWithGoogle } = useAuth()
+  const [googleAuth] = useGoogleAuthMutation()
+  const router = useRouter()
 
   const handleGoogleAuth = async () => {
     setIsLoading(true)
 
     try {
-      // Simulate Google OAuth flow
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-
-      if (mode === "login") {
-        await loginWithGoogle()
+      const result = await googleAuth({ mode }).unwrap()
+      
+      // Redirect based on user role after successful authentication
+      if (result.role === 'freelancer') {
+        router.push('/freelancer/dashboard')
+      } else if (result.role === 'client') {
+        router.push('/client/dashboard')
       } else {
-        await signupWithGoogle()
+        router.push('/dashboard')
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Google authentication failed:", error)
+      // You might want to show a toast or error message here
     } finally {
       setIsLoading(false)
     }
