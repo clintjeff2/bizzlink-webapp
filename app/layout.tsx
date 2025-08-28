@@ -1,15 +1,15 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { Inter } from "next/font/google"
 import "./globals.css"
 import { AuthProviderRedux } from "@/components/auth-provider-redux"
 import { ThemeProvider } from "@/components/theme-provider"
 import { ReduxProvider } from "@/lib/redux"
 
-const inter = Inter({ 
-  subsets: ["latin"],
+// Use system fonts as fallback to avoid Google Fonts timeout issues
+const fontFamily = {
   variable: '--font-inter',
-})
+  className: 'font-inter'
+}
 
 export const metadata: Metadata = {
   title: "Bizzlink - Connect. Create. Collaborate.",
@@ -24,7 +24,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} font-sans`}>
+      <head>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      <body className={`${fontFamily.variable} font-sans`}>
         <ReduxProvider>
           <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
             <AuthProviderRedux>{children}</AuthProviderRedux>
