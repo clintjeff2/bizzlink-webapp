@@ -22,6 +22,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
+import { Navigation } from "@/components/navigation"
 
 const freelancers = [
   {
@@ -237,43 +238,7 @@ export default function FreelancersPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Navigation */}
-      <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-lg border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-8">
-              <Link href="/" className="flex items-center space-x-2">
-                <Image src="/images/bizzlink-icon.png" alt="Bizzlink" width={32} height={32} className="w-8 h-8" />
-                <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-green-500 bg-clip-text text-transparent">
-                  Bizzlink
-                </span>
-              </Link>
-              <div className="hidden md:flex space-x-6">
-                <Link href="/projects" className="text-gray-700 hover:text-blue-600 transition-colors">
-                  Find Work
-                </Link>
-                <Link href="/freelancers" className="text-blue-600 font-medium">
-                  Find Talent
-                </Link>
-                <Link href="/how-it-works" className="text-gray-700 hover:text-blue-600 transition-colors">
-                  How it Works
-                </Link>
-              </div>
-            </div>
-            <div className="flex items-center space-x-4">
-              <Link href="/auth/login">
-                <Button variant="ghost" className="text-gray-700 hover:text-blue-600">
-                  Log In
-                </Button>
-              </Link>
-              <Link href="/auth/signup">
-                <Button className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg">
-                  Sign Up
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <Navigation />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
