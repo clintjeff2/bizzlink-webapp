@@ -17,7 +17,6 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
-import { Navigation } from "@/components/navigation"
 
 const dashboardStats = {
   totalSpent: 45600,
@@ -138,17 +137,14 @@ const recentProposals = [
 
 export default function ClientDashboard() {
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Navigation />
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Header */}
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome back, John!</h1>
+        <p className="text-gray-600">Manage your projects and find the perfect freelancers</p>
+      </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome back, John!</h1>
-          <p className="text-gray-600">Manage your projects and find the perfect freelancers</p>
-        </div>
-
-        {/* Stats Cards */}
+      {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card className="border-0 shadow-lg">
             <CardContent className="p-6">
@@ -248,7 +244,7 @@ export default function ClientDashboard() {
                             alt={project.freelancer || ""}
                             width={32}
                             height={32}
-                            className="w-8 h-8 rounded-full mr-3"
+                            className="w-8 h-8 rounded-full object-cover mr-3"
                           />
                         ) : (
                           <div className="w-8 h-8 bg-gray-200 rounded-full mr-3 flex items-center justify-center">
@@ -326,7 +322,7 @@ export default function ClientDashboard() {
                       alt={message.freelancer}
                       width={32}
                       height={32}
-                      className="w-8 h-8 rounded-full"
+                      className="w-8 h-8 rounded-full object-cover"
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">
@@ -357,7 +353,7 @@ export default function ClientDashboard() {
                           alt={proposal.freelancer}
                           width={24}
                           height={24}
-                          className="w-6 h-6 rounded-full mr-2"
+                          className="w-6 h-6 rounded-full object-cover mr-2"
                         />
                         <div>
                           <h4 className="text-sm font-medium text-gray-900">{proposal.freelancer}</h4>
@@ -415,6 +411,5 @@ export default function ClientDashboard() {
           </div>
         </div>
       </div>
-    </div>
   )
 }
