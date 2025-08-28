@@ -1,7 +1,9 @@
 "use client"
 
-import { useEffect, useState } from 'react'
-import { useAuth } from '@/components/auth-provider'
+import { useState, useEffect } from 'react'
+import { doc, getDoc, updateDoc } from 'firebase/firestore'
+import { db } from '../../firebase'
+import { useAuth } from '@/components/auth-provider-redux'
 import {
   useGetUserOnboardingDataQuery,
   useUpdateUserSpecialtiesMutation,
