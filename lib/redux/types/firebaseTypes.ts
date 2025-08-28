@@ -28,6 +28,8 @@ export interface User {
   photoURL: string;                  // Profile image URL
   isActive: boolean;
   isVerified: boolean;               // Identity verification
+  paymentVerified?: boolean;         // Payment method verification
+  phoneVerified?: boolean;           // Phone number verification
   accountStatus: "active" | "suspended" | "pending";
   createdAt: string;                 // ISO string instead of Timestamp
   updatedAt: string;                 // ISO string instead of Timestamp
@@ -80,11 +82,19 @@ export interface UserAboutInfo {
   dob: string;                       // ISO date
   profileUrl: string;
   downloadLink: string;
+  bio?: string;                      // Personal bio/description
+  timezone?: string;                 // User's timezone
   
   // Professional Links
   websiteUrl?: string;
   linkedinUrl?: string;
   githubUrl?: string;
+  
+  // Client-specific Company Information
+  companyName?: string;              // Company name for clients
+  industry?: string;                 // Industry for clients
+  companySize?: string;              // Company size for clients
+  companyDescription?: string;       // Company description for clients
   
   // Languages
   primaryLanguage?: string;
@@ -121,6 +131,17 @@ export interface UserEmployment {
   startDate: string;
   endDate: string;                   // "Present" for current
   description: string;
+  current?: boolean;                 // true if currently employed here
+}
+
+export interface UserCertification {
+  id: string;
+  name: string;
+  issuer: string;
+  issueDate: string;
+  expirationDate?: string;
+  credentialId: string;
+  credentialUrl?: string;
 }
 
 export interface UserPortfolio {
@@ -148,6 +169,7 @@ export interface UserStats {
   responseRate: number;
   onTimeDelivery: number;
   repeatClients: number;
+  hirRate?: number;                  // For clients - hire rate percentage
 }
 
 export interface UserPreferences {
@@ -167,6 +189,7 @@ export interface Project {
   projectId: string;
   title: string;
   description: string;
+  detailedRequirements?: string;      // Detailed requirements and specifications
   category: string;
   subcategory: string;
   clientId: string;                  // Reference to users collection
@@ -179,10 +202,10 @@ export interface Project {
   proposalCount: number;
   hiredFreelancerId: string;         // When project is awarded
   milestones: ProjectMilestone[];
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
-  publishedAt: Timestamp;
-  closedAt: Timestamp;
+  createdAt: string;                 // ISO string instead of Timestamp
+  updatedAt: string;                 // ISO string instead of Timestamp
+  publishedAt: string | null;        // ISO string instead of Timestamp
+  closedAt: string | null;           // ISO string instead of Timestamp
 }
 
 export interface ProjectClientInfo {
@@ -201,8 +224,8 @@ export interface ProjectBudget {
 
 export interface ProjectTimeline {
   duration: string;                  // "1 week", "2 months", etc.
-  startDate: Timestamp;
-  endDate: Timestamp;
+  startDate: string;                 // ISO string instead of Timestamp
+  endDate: string;                   // ISO string instead of Timestamp
   isUrgent: boolean;
 }
 
@@ -218,7 +241,7 @@ export interface ProjectAttachment {
   fileName: string;
   fileUrl: string;
   fileType: string;
-  uploadedAt: Timestamp;
+  uploadedAt: string;               // ISO string instead of Timestamp
 }
 
 export interface ProjectMilestone {
@@ -226,7 +249,7 @@ export interface ProjectMilestone {
   title: string;
   description: string;
   amount: number;
-  dueDate: Timestamp;
+  dueDate: string;                   // ISO string instead of Timestamp
   status: "pending" | "in_progress" | "completed" | "approved";
   deliverables: string[];
 }
