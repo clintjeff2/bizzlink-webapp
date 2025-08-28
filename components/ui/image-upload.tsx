@@ -8,7 +8,7 @@ import { Upload, X, User, Camera, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import Image from "next/image"
 import { uploadProfileImage, compressImage } from "@/lib/services/storageService"
-import { useAuth } from "@/components/auth-provider"
+import { useAuth } from "@/components/auth-provider-redux"
 
 interface ImageUploadProps {
   value?: string
