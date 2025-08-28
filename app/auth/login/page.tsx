@@ -13,7 +13,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Eye, EyeOff, Mail, Lock, AlertCircle } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
-import { useAuth } from "@/components/auth-provider"
+import { useRouter } from "next/navigation"
+import { useLoginMutation } from "@/lib/redux/api/firebaseApi"
 import { GoogleAuth } from "@/components/google-auth"
 
 export default function LoginPage() {
@@ -21,21 +22,49 @@ export default function LoginPage() {
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
-  const { login } = useAuth()
+  const [login, { isLoading: isLoginLoading }] = useLoginMutation()
+  const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsLoading(true)
     setError("")
 
     try {
-      await login({ email, password, rememberMe })
-    } catch (error: any) {
-      setError(error.message || "Login failed. Please check your credentials.")
-    } finally {
-      setIsLoading(false)
+      const result = await login({ email, password }).unwrap()
+      
+      // Check if user has completed basic profile setup based on required fields
+      const hasBasicProfile = result.firstname && result.lastname && result.role
+      const hasDetailedProfile = result.title && result.overview
+      
+      // Redirect based on user role and profile completion status
+      if (!hasBasicProfile) {
+        // User needs to complete basic signup/onboarding
+        if (result.role === 'freelancer') {
+          router.push('/freelancer/onboarding')
+        } else if (result.role === 'client') {
+          router.push('/client/onboarding') 
+        } else {
+          router.push('/onboarding')
+        }
+      } else if (!hasDetailedProfile && result.role === 'freelancer') {
+        // Freelancer needs to complete detailed profile setup
+        router.push('/freelancer/onboarding')
+      } else {
+        // User has completed setup, redirect to dashboard
+        if (result.role === 'freelancer') {
+          router.push('/freelancer/dashboard')
+        } else if (result.role === 'client') {
+          router.push('/client/dashboard')
+        } else if (result.role === 'admin') {
+          router.push('/admin')
+        } else {
+          router.push('/dashboard')
+        }
+      }
+    } catch (err: any) {
+      console.error('Login error:', err)
+      setError(err.error || err.message || "Login failed. Please try again.")
     }
   }
 
@@ -127,10 +156,10 @@ export default function LoginPage() {
 
               <Button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoginLoading}
                 className="w-full h-12 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl font-semibold shadow-lg"
               >
-                {isLoading ? (
+                {isLoginLoading ? (
                   <div className="flex items-center space-x-2">
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                     <span>Signing In...</span>
