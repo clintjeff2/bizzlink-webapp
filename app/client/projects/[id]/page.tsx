@@ -32,7 +32,8 @@ import {
   TrendingUp,
 } from "lucide-react"
 import { Navigation } from "@/components/navigation"
-import { useAuth } from "@/components/auth-provider"
+import { useSelector } from "react-redux"
+import { RootState } from "@/lib/redux/store"
 import Link from "next/link"
 import Image from "next/image"
 import { useParams } from "next/navigation"
@@ -51,7 +52,7 @@ const projectDetails = {
   category: "Web Development",
   experienceLevel: "Expert",
   skills: ["React", "Node.js", "MongoDB", "Stripe", "JavaScript", "Express.js", "CSS", "HTML"],
-  proposals: 34,
+  proposalCount: 34,
   hired: {
     freelancer: {
       id: 1,
@@ -346,7 +347,7 @@ const getFileIcon = (type: string) => {
 }
 
 export default function ClientProjectDetailPage() {
-  const { user } = useAuth()
+  const { user } = useSelector((state: RootState) => state.auth)
   const params = useParams()
   const [activeTab, setActiveTab] = useState("overview")
 
@@ -375,7 +376,7 @@ export default function ClientProjectDetailPage() {
           <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between space-y-4 lg:space-y-0">
             <div className="flex-1">
               <div className="flex items-center space-x-3 mb-2">
-                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{projectDetails.title}</h1>
+                <h1 className="text-xl lg:text-2xl font-bold text-gray-900 dark:text-white">{projectDetails.title}</h1>
                 <Badge
                   variant="outline"
                   className={`${getStatusColor(projectDetails.status)} flex items-center space-x-1`}
@@ -503,7 +504,7 @@ export default function ClientProjectDetailPage() {
                           </div>
                           <div className="flex justify-between">
                             <span className="text-gray-600 dark:text-gray-300">Proposals Received:</span>
-                            <span className="font-medium">{projectDetails.proposals}</span>
+                            <span className="font-medium">{projectDetails.proposalCount}</span>
                           </div>
                         </div>
                       </div>
@@ -655,7 +656,7 @@ export default function ClientProjectDetailPage() {
               <TabsContent value="proposals" className="space-y-6">
                 <Card className="shadow-lg border-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
                   <CardHeader>
-                    <CardTitle>Received Proposals ({projectDetails.proposals})</CardTitle>
+                    <CardTitle>Received Proposals ({projectDetails.proposalCount})</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-6">
@@ -963,7 +964,7 @@ export default function ClientProjectDetailPage() {
                 <Separator />
                 <div className="flex justify-between items-center">
                   <span className="text-gray-600 dark:text-gray-300">Proposals</span>
-                  <span className="font-semibold">{projectDetails.proposals}</span>
+                  <span className="font-semibold">{projectDetails.proposalCount}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-gray-600 dark:text-gray-300">Messages</span>
