@@ -23,15 +23,16 @@ import {
 import Link from "next/link"
 import Image from "next/image"
 import { Navigation } from "@/components/navigation"
-import { useAuth } from "@/components/auth-provider"
+import { useSelector } from "react-redux"
+import { RootState } from "@/lib/redux/store"
 
 const categories = [
   { name: "Web Development", count: "2,847", icon: "💻", color: "bg-blue-50 text-blue-600" },
   { name: "Mobile Apps", count: "1,923", icon: "📱", color: "bg-green-50 text-green-600" },
-  { name: "UI/UX Design", count: "3,156", icon: "🎨", color: "bg-purple-50 text-purple-600" },
+  { name: "UI/UX Design", count: "3,156", icon: "🎨", color: "bg-green-50 text-green-600" },
   { name: "Digital Marketing", count: "2,234", icon: "📈", color: "bg-orange-50 text-orange-600" },
   { name: "Content Writing", count: "1,876", icon: "✍️", color: "bg-pink-50 text-pink-600" },
-  { name: "Data Science", count: "987", icon: "📊", color: "bg-indigo-50 text-indigo-600" },
+  { name: "Data Science", count: "987", icon: "📊", color: "bg-blue-50 text-blue-600" },
 ]
 
 const featuredFreelancers = [
@@ -112,14 +113,14 @@ const recentProjects = [
 const stats = [
   { label: "Active Freelancers", value: "50,000+", icon: Users, color: "text-blue-600" },
   { label: "Projects Completed", value: "125,000+", icon: Briefcase, color: "text-green-600" },
-  { label: "Total Earnings", value: "$45M+", icon: DollarSign, color: "text-purple-600" },
+  { label: "Total Earnings", value: "$45M+", icon: DollarSign, color: "text-green-600" },
   { label: "Client Satisfaction", value: "98.5%", icon: TrendingUp, color: "text-orange-600" },
 ]
 
 export default function HomePage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [isVisible, setIsVisible] = useState(false)
-  const { user } = useAuth()
+  const { user } = useSelector((state: RootState) => state.auth)
 
   useEffect(() => {
     setIsVisible(true)
@@ -156,7 +157,7 @@ export default function HomePage() {
             >
               <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-gray-900 mb-6">
                 Find the Perfect
-                <span className="block bg-gradient-to-r from-blue-600 via-purple-600 to-green-500 bg-clip-text text-transparent">
+                <span className="block bg-gradient-to-r from-blue-600 via-teal-600 to-green-500 bg-clip-text text-transparent">
                   Freelance Services
                 </span>
               </h1>
@@ -448,8 +449,8 @@ export default function HomePage() {
 
             <div className="text-center">
               <div className="flex justify-center mb-6">
-                <div className="p-4 rounded-3xl bg-gradient-to-br from-purple-100 to-purple-200">
-                  <Award className="w-8 h-8 text-purple-600" />
+                <div className="p-4 rounded-3xl bg-gradient-to-br from-green-100 to-green-200">
+                  <Award className="w-8 h-8 text-green-600" />
                 </div>
               </div>
               <h3 className="text-xl font-semibold text-gray-900 mb-3">Quality Guaranteed</h3>
@@ -463,7 +464,7 @@ export default function HomePage() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 bg-gradient-to-r from-blue-600 via-purple-600 to-green-500">
+      <section className="py-20 bg-gradient-to-r from-blue-600 via-teal-600 to-green-500">
         <div className="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">
           <h2 className="text-3xl md:text-4xl font-bold text-white mb-6">Ready to Get Started?</h2>
           <p className="text-xl text-blue-100 mb-8 max-w-2xl mx-auto">
