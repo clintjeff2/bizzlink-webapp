@@ -407,7 +407,7 @@ export default function PaymentDetail() {
                     alt={paymentData.freelancer.name}
                     width={48}
                     height={48}
-                    className="w-12 h-12 rounded-full"
+                    className="w-12 h-12 rounded-full object-cover"
                   />
                   <div>
                     <h4 className="font-semibold text-gray-900 dark:text-white">{paymentData.freelancer.name}</h4>
