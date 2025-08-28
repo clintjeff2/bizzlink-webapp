@@ -11,6 +11,8 @@ import { Shield, RefreshCw, CheckCircle, AlertCircle } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
+import { useSelector } from "react-redux"
+import { RootState } from "@/lib/redux/store"
 
 export default function TwoFactorPage() {
   const [code, setCode] = useState(["", "", "", "", "", ""])
@@ -21,6 +23,7 @@ export default function TwoFactorPage() {
   const [isSuccess, setIsSuccess] = useState(false)
   const inputRefs = useRef<(HTMLInputElement | null)[]>([])
   const router = useRouter()
+  const { user } = useSelector((state: RootState) => state.auth)
 
   useEffect(() => {
     // Focus first input on mount
@@ -95,7 +98,14 @@ export default function TwoFactorPage() {
       if (finalCode === "123456") {
         setIsSuccess(true)
         setTimeout(() => {
-          router.push("/dashboard")
+          // Role-based redirection
+          if (user?.role === 'client') {
+            router.push("/client/dashboard")
+          } else if (user?.role === 'admin') {
+            router.push("/admin")
+          } else {
+            router.push("/dashboard") // freelancer dashboard
+          }
         }, 2000)
       } else {
         setError("Invalid verification code. Please try again.")
@@ -173,7 +183,7 @@ export default function TwoFactorPage() {
                     {code.map((digit, index) => (
                       <Input
                         key={index}
-                        ref={(el) => (inputRefs.current[index] = el)}
+                        ref={(el) => { inputRefs.current[index] = el }}
                         type="text"
                         inputMode="numeric"
                         pattern="[0-9]*"
