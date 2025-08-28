@@ -1,569 +1,646 @@
 "use client"
 
-import { useState } from "react"
+import React, { useState, useMemo } from "react"
+import { useRouter } from "next/navigation"
+import { useGetProjectsByClientQuery } from "@/lib/redux/api/firebaseApi"
+import { useSelector } from "react-redux"
+import { RootState } from "@/lib/redux/store"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import {
-  Search,
-  Plus,
-  Eye,
-  MessageSquare,
-  Calendar,
-  DollarSign,
-  Users,
+import { 
+  Search, 
+  Plus, 
+  Filter, 
+  Calendar, 
+  DollarSign, 
+  Users, 
+  Eye, 
+  Edit, 
   Clock,
+  BarChart3,
+  TrendingUp,
   CheckCircle,
   AlertCircle,
-  TrendingUp,
+  PauseCircle,
+  XCircle,
   Briefcase,
-  Star,
-  MapPin,
+  RefreshCw
 } from "lucide-react"
-import { Navigation } from "@/components/navigation"
-import { useAuth } from "@/components/auth-provider"
-import Link from "next/link"
-import Image from "next/image"
+import { updateDraftProjectsToActive } from "@/lib/utils/updateProjectStatus"
 
-const projects = [
-  {
-    id: 1,
-    title: "E-commerce Website Development with React & Node.js",
-    description:
-      "Complete e-commerce platform with user authentication, payment integration, inventory management, and admin dashboard. Must have experience with React, Node.js, MongoDB, and Stripe integration.",
-    status: "in_progress",
-    budget: { type: "fixed", amount: 5000 },
-    postedDate: "2024-01-01",
-    deadline: "2024-02-15",
-    category: "Web Development",
-    skills: ["React", "Node.js", "MongoDB", "Stripe", "JavaScript"],
-    proposals: 34,
-    hired: {
-      freelancer: {
-        name: "Sarah Chen",
-        avatar: "/professional-asian-woman-developer.png",
-        rating: 4.9,
-        hourlyRate: 85,
-      },
-      startDate: "2024-01-10",
-    },
-    milestones: [
-      { name: "Project Setup", completed: true, amount: 1500 },
-      { name: "Frontend Development", completed: true, amount: 2000 },
-      { name: "Backend Integration", completed: false, amount: 1500 },
-    ],
-    progress: 65,
-    totalSpent: 3500,
-    messagesCount: 23,
-  },
-  {
-    id: 2,
-    title: "Mobile App UI/UX Design for Fitness Platform",
-    description:
-      "Need a talented UI/UX designer to create a modern, intuitive design for our fitness tracking mobile app. The design should include onboarding screens, workout tracking, progress analytics, and social features.",
-    status: "completed",
-    budget: { type: "fixed", amount: 3500 },
-    postedDate: "2023-12-15",
-    deadline: "2024-01-20",
-    category: "Design",
-    skills: ["UI/UX Design", "Figma", "Mobile Design", "Prototyping"],
-    proposals: 28,
-    hired: {
-      freelancer: {
-        name: "Marcus Johnson",
-        avatar: "/professional-black-designer.png",
-        rating: 5.0,
-        hourlyRate: 75,
-      },
-      startDate: "2023-12-20",
-      completedDate: "2024-01-18",
-    },
-    milestones: [
-      { name: "Wireframes", completed: true, amount: 1000 },
-      { name: "UI Design", completed: true, amount: 1500 },
-      { name: "Prototyping", completed: true, amount: 1000 },
-    ],
-    progress: 100,
-    totalSpent: 3500,
-    messagesCount: 15,
-    rating: 5,
-    feedback: "Exceptional work! Marcus delivered exactly what we needed.",
-  },
-  {
-    id: 3,
-    title: "SEO & Content Marketing Strategy for SaaS Platform",
-    description:
-      "Seeking an experienced SEO specialist and content marketer to develop and execute a comprehensive strategy for our B2B SaaS platform. Need someone who can create high-quality content, optimize for search engines, and drive organic traffic growth.",
-    status: "active",
-    budget: { type: "hourly", min: 50, max: 80 },
-    postedDate: "2024-01-05",
-    deadline: "2024-04-05",
-    category: "Digital Marketing",
-    skills: ["SEO", "Content Marketing", "Google Analytics", "Keyword Research"],
-    proposals: 19,
-    hired: null,
-    milestones: [],
-    progress: 0,
-    totalSpent: 0,
-    messagesCount: 0,
-  },
-  {
-    id: 4,
-    title: "Brand Identity & Logo Design for Tech Startup",
-    description:
-      "New tech startup needs a complete brand identity package including logo design, color palette, typography, and brand guidelines. Looking for a creative designer who can capture our innovative and modern vision.",
-    status: "draft",
-    budget: { type: "fixed", amount: 2000 },
-    postedDate: null,
-    deadline: "2024-02-28",
-    category: "Design",
-    skills: ["Logo Design", "Brand Identity", "Adobe Illustrator", "Typography"],
-    proposals: 0,
-    hired: null,
-    milestones: [],
-    progress: 0,
-    totalSpent: 0,
-    messagesCount: 0,
-  },
-  {
-    id: 5,
-    title: "WordPress Website Development & Customization",
-    description:
-      "Need a WordPress developer to create a custom business website with advanced functionality. Requirements include custom theme development, plugin integration, SEO optimization, and responsive design.",
-    status: "paused",
-    budget: { type: "fixed", amount: 2750 },
-    postedDate: "2023-12-01",
-    deadline: "2024-01-30",
-    category: "Web Development",
-    skills: ["WordPress", "PHP", "CSS", "JavaScript", "MySQL"],
-    proposals: 31,
-    hired: {
-      freelancer: {
-        name: "David Kim",
-        avatar: "/asian-mobile-developer.png",
-        rating: 4.7,
-        hourlyRate: 65,
-      },
-      startDate: "2023-12-10",
-    },
-    milestones: [
-      { name: "Theme Setup", completed: true, amount: 750 },
-      { name: "Content Migration", completed: false, amount: 1000 },
-      { name: "Customization", completed: false, amount: 1000 },
-    ],
-    progress: 25,
-    totalSpent: 750,
-    messagesCount: 8,
-  },
-]
-
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case "active":
-      return "bg-blue-100 text-blue-800 border-blue-200"
-    case "in_progress":
-      return "bg-purple-100 text-purple-800 border-purple-200"
-    case "completed":
-      return "bg-green-100 text-green-800 border-green-200"
-    case "paused":
-      return "bg-yellow-100 text-yellow-800 border-yellow-200"
-    case "draft":
-      return "bg-gray-100 text-gray-800 border-gray-200"
-    default:
-      return "bg-gray-100 text-gray-800 border-gray-200"
-  }
-}
-
-const getStatusIcon = (status: string) => {
-  switch (status) {
-    case "active":
-      return <Clock className="w-4 h-4" />
-    case "in_progress":
-      return <Clock className="w-4 h-4" />
-    case "completed":
-      return <CheckCircle className="w-4 h-4" />
-    case "paused":
-      return <AlertCircle className="w-4 h-4" />
-    case "draft":
-      return <Clock className="w-4 h-4" />
-    default:
-      return <Clock className="w-4 h-4" />
-  }
-}
-
-export default function ClientProjectsPage() {
-  const { user } = useAuth()
-  const [searchQuery, setSearchQuery] = useState("")
-  const [statusFilter, setStatusFilter] = useState("all")
-  const [categoryFilter, setCategoryFilter] = useState("all")
-  const [activeTab, setActiveTab] = useState("all")
-
-  const filteredProjects = projects.filter((project) => {
-    const matchesSearch =
-      project.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      project.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      project.skills.some((skill) => skill.toLowerCase().includes(searchQuery.toLowerCase()))
-
-    const matchesStatus = statusFilter === "all" || project.status === statusFilter
-    const matchesCategory = categoryFilter === "all" || project.category === categoryFilter
-    const matchesTab =
-      activeTab === "all" ||
-      (activeTab === "active" && (project.status === "active" || project.status === "in_progress")) ||
-      (activeTab === "completed" && project.status === "completed") ||
-      (activeTab === "draft" && project.status === "draft")
-
-    return matchesSearch && matchesStatus && matchesCategory && matchesTab
-  })
-
-  const stats = {
-    total: projects.length,
-    active: projects.filter((p) => p.status === "active" || p.status === "in_progress").length,
-    completed: projects.filter((p) => p.status === "completed").length,
-    totalSpent: projects.reduce((sum, p) => sum + p.totalSpent, 0),
+const ProjectCard = ({ project, onViewDetails, onEdit }: any) => {
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'active': return 'bg-emerald-50 text-emerald-700 border-emerald-200'
+      case 'completed': return 'bg-blue-50 text-blue-700 border-blue-200'
+      case 'paused': return 'bg-amber-50 text-amber-700 border-amber-200'
+      case 'cancelled': return 'bg-red-50 text-red-700 border-red-200'
+      case 'draft': return 'bg-slate-50 text-slate-700 border-slate-200'
+      default: return 'bg-slate-50 text-slate-700 border-slate-200'
+    }
   }
 
-  if (!user || user.role !== "client") {
-    return <div>Please log in as a client to view your projects.</div>
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'active': return <CheckCircle className="w-4 h-4" />
+      case 'completed': return <CheckCircle className="w-4 h-4" />
+      case 'paused': return <PauseCircle className="w-4 h-4" />
+      case 'cancelled': return <XCircle className="w-4 h-4" />
+      case 'draft': return <Edit className="w-4 h-4" />
+      default: return <AlertCircle className="w-4 h-4" />
+    }
+  }
+
+  const formatBudget = (project: any) => {
+    console.log("Budget data for project:", project.title, project.budget)
+    
+    // Handle different budget structures
+    if (!project.budget) return 'Budget not set'
+    
+    const currency = project.budget.currency || 'USD'
+    const symbol = currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency + ' '
+    
+    // Handle different budget formats
+    if (project.budget.amount) {
+      // Single amount
+      return `${symbol}${Number(project.budget.amount).toLocaleString()}`
+    } else if (project.budget.min && project.budget.max) {
+      // Range
+      const min = Number(project.budget.min).toLocaleString()
+      const max = Number(project.budget.max).toLocaleString()
+      const suffix = project.budget.type === 'hourly' ? '/hr' : ''
+      return `${symbol}${min} - ${symbol}${max}${suffix}`
+    } else if (project.budget.min) {
+      // Minimum only
+      const suffix = project.budget.type === 'hourly' ? '/hr' : ''
+      return `From ${symbol}${Number(project.budget.min).toLocaleString()}${suffix}`
+    } else if (project.budget.max) {
+      // Maximum only
+      const suffix = project.budget.type === 'hourly' ? '/hr' : ''
+      return `Up to ${symbol}${Number(project.budget.max).toLocaleString()}${suffix}`
+    }
+    
+    return 'Budget not specified'
+  }
+
+  const formatTimeline = (project: any) => {
+    if (!project.timeline) return 'Timeline not set'
+    
+    // Handle different timeline formats
+    if (typeof project.timeline === 'string') {
+      return project.timeline.replace('-', ' ')
+    }
+    
+    if (project.timeline.duration) {
+      return project.timeline.duration
+    }
+    
+    if (project.timeline.startDate && project.timeline.endDate) {
+      const start = new Date(project.timeline.startDate).toLocaleDateString()
+      const end = new Date(project.timeline.endDate).toLocaleDateString()
+      return `${start} - ${end}`
+    }
+    
+    if (project.timeline.startDate) {
+      const start = new Date(project.timeline.startDate).toLocaleDateString()
+      return `Starts ${start}`
+    }
+    
+    return 'Timeline not specified'
+  }
+
+  const formatCreatedDate = (project: any) => {
+    if (project.createdAt) {
+      // Handle different date formats
+      if (typeof project.createdAt === 'string') {
+        return new Date(project.createdAt).toLocaleDateString()
+      } else if (project.createdAt.seconds) {
+        return new Date(project.createdAt.seconds * 1000).toLocaleDateString()
+      } else if (project.createdAt.toDate) {
+        return project.createdAt.toDate().toLocaleDateString()
+      }
+    }
+    return 'Date not available'
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-blue-900 dark:to-indigo-900">
-      <Navigation />
+    <Card className="group hover:shadow-xl transition-all duration-300 border border-slate-200 bg-white overflow-hidden relative">
+      {/* Hover overlay - only appears on card hover */}
+      <div className="absolute inset-0 bg-gradient-to-br from-blue-50/30 to-green-50/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none" />
+      
+      <CardHeader className="relative pb-4 border-b border-slate-100 z-10">
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex-1">
+            <CardTitle className="text-xl font-bold text-slate-800 mb-2 line-clamp-2 leading-tight">
+              {project.title}
+            </CardTitle>
+            <div className="flex items-center gap-2 mb-3">
+              <Badge className={`${getStatusColor(project.status)} border font-medium px-3 py-1`}>
+                <div className="flex items-center space-x-1.5">
+                  {getStatusIcon(project.status)}
+                  <span className="capitalize">{project.status}</span>
+                </div>
+              </Badge>
+              {project.isUrgent && (
+                <Badge className="bg-red-50 text-red-700 border-red-200 font-medium">
+                  <AlertCircle className="w-3 h-3 mr-1" />
+                  Urgent
+                </Badge>
+              )}
+              {project.featured && (
+                <Badge className="bg-gradient-to-r from-yellow-400 to-orange-400 text-white border-0 font-medium">
+                  ⭐ Featured
+                </Badge>
+              )}
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="text-2xl font-bold text-emerald-600 mb-1">
+              {formatBudget(project)}
+            </div>
+            <div className="text-xs text-slate-500">
+              {project.budget?.type === 'hourly' ? 'Hourly Rate' : 'Project Budget'}
+            </div>
+          </div>
+        </div>
+        
+        <p className="text-slate-600 line-clamp-2 leading-relaxed">
+          {project.description}
+        </p>
+      </CardHeader>
+      
+      <CardContent className="relative pt-4 space-y-4 z-10">
+        {/* Project Details Grid */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-3">
+            <div className="flex items-center space-x-2 text-sm">
+              <div className="p-1.5 bg-blue-100 rounded-lg">
+                <Calendar className="w-4 h-4 text-blue-600" />
+              </div>
+              <div>
+                <div className="text-xs text-slate-500 uppercase tracking-wide">Timeline</div>
+                <div className="font-medium text-slate-700">{formatTimeline(project)}</div>
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-2 text-sm">
+              <div className="p-1.5 bg-primary-green/10 rounded-lg">
+                <Users className="w-4 h-4 text-primary-green-dark" />
+              </div>
+              <div>
+                <div className="text-xs text-slate-500 uppercase tracking-wide">Proposals</div>
+                <div className="font-medium text-slate-700">{project.proposalCount || 0} received</div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="space-y-3">
+            <div className="flex items-center space-x-2 text-sm">
+              <div className="p-1.5 bg-green-100 rounded-lg">
+                <Briefcase className="w-4 h-4 text-green-600" />
+              </div>
+              <div>
+                <div className="text-xs text-slate-500 uppercase tracking-wide">Category</div>
+                <div className="font-medium text-slate-700">{project.category || 'General'}</div>
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-2 text-sm">
+              <div className="p-1.5 bg-orange-100 rounded-lg">
+                <Clock className="w-4 h-4 text-orange-600" />
+              </div>
+              <div>
+                <div className="text-xs text-slate-500 uppercase tracking-wide">Posted</div>
+                <div className="font-medium text-slate-700">{formatCreatedDate(project)}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Skills Section */}
+        {project.requirements?.skills && project.requirements.skills.length > 0 && (
+          <div className="space-y-2">
+            <div className="text-xs text-slate-500 uppercase tracking-wide">Required Skills</div>
+            <div className="flex flex-wrap gap-1.5">
+              {project.requirements.skills.slice(0, 4).map((skill: string) => (
+                <Badge key={skill} variant="outline" className="text-xs bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 transition-colors">
+                  {skill}
+                </Badge>
+              ))}
+              {project.requirements.skills.length > 4 && (
+                <Badge variant="outline" className="text-xs bg-slate-50 text-slate-700 border-slate-200">
+                  +{project.requirements.skills.length - 4} more
+                </Badge>
+              )}
+            </div>
+          </div>
+        )}
+        
+        {/* Action Buttons */}
+        <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+          <div className="flex items-center space-x-4 text-xs text-slate-500">
+            <div className="flex items-center space-x-1">
+              <Eye className="w-3 h-3" />
+              <span>{project.views || 0} views</span>
+            </div>
+            {project.saved && (
+              <div className="flex items-center space-x-1 text-blue-600">
+                <span>⭐ Saved</span>
+              </div>
+            )}
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onViewDetails(project.projectId)}
+              className="text-xs bg-white hover:bg-slate-50 border-slate-200 text-slate-700"
+            >
+              <Eye className="w-3 h-3 mr-1" />
+              View Details
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => onEdit(project.projectId)}
+              className="text-xs bg-gradient-to-r from-primary-blue to-primary-green hover:from-primary-blue-dark hover:to-primary-green-dark text-white border-0 shadow-sm"
+            >
+              <Edit className="w-3 h-3 mr-1" />
+              Edit
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+export default function ClientProjectsPage() {
+  const router = useRouter()
+  const [searchTerm, setSearchTerm] = useState("")
+  const [activeTab, setActiveTab] = useState("all")
+  
+  const { user } = useSelector((state: RootState) => state.auth)
+  
+  // Enhanced Debug Logging
+  console.log("=== CLIENT PROJECTS PAGE DEBUG ===")
+  console.log("1. Current user object:", user)
+  console.log("2. User ID for query:", user?.userId)
+  console.log("3. User role:", user?.role)
+  console.log("4. Is user authenticated:", !!user)
+  
+  const {
+    data: projects = [],
+    isLoading,
+    error
+  } = useGetProjectsByClientQuery({ 
+    clientId: user?.userId || "" 
+  }, {
+    skip: !user?.userId
+  })
+  
+  // Enhanced Debug Logging for Query Results
+  console.log("5. Projects query skipped:", !user?.userId)
+  console.log("6. Projects query result:", { 
+    projectsCount: projects.length, 
+    projects: projects.slice(0, 2), // Log first 2 projects only
+    isLoading, 
+    error 
+  })
+  console.log("7. First project details (if exists):")
+  if (projects[0]) {
+    console.log("   - Project ID:", projects[0].projectId)
+    console.log("   - Client ID:", projects[0].clientId)
+    console.log("   - Title:", projects[0].title)
+    console.log("   - Status:", projects[0].status)
+    console.log("   - Budget structure:", projects[0].budget)
+    console.log("   - Timeline structure:", projects[0].timeline)
+    console.log("   - Created at:", projects[0].createdAt)
+    console.log("   - Skills:", projects[0].requirements?.skills)
+    console.log("   - Category:", projects[0].category)
+  }
+  
+  // Log all project statuses to understand the issue
+  console.log("8. All project statuses:")
+  projects.forEach((project: any, index: number) => {
+    console.log(`   Project ${index + 1}: "${project.title}" - Status: "${project.status}"`)
+  })
+  
+  console.log("===============================")
+
+  const filteredProjects = useMemo(() => {
+    let filtered = projects
+
+    // Filter by search term
+    if (searchTerm) {
+      filtered = filtered.filter((project: any) =>
+        project.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        project.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        project.requirements?.skills?.some((skill: string) => 
+          skill.toLowerCase().includes(searchTerm.toLowerCase())
+        ) ||
+        project.category.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    }
+
+    // Filter by tab
+    if (activeTab !== "all") {
+      filtered = filtered.filter((project: any) => project.status === activeTab)
+    }
+
+    return filtered
+  }, [projects, searchTerm, activeTab])
+
+  const projectStats = useMemo(() => {
+    const stats = {
+      total: projects.length,
+      active: projects.filter((p: any) => p.status === 'active').length,
+      completed: projects.filter((p: any) => p.status === 'completed').length,
+      draft: projects.filter((p: any) => p.status === 'draft').length,
+      totalBudget: projects.reduce((sum: number, p: any) => {
+        return sum + (p.budget?.max || 0)
+      }, 0),
+      totalProposals: projects.reduce((sum: number, p: any) => {
+        return sum + (p.proposalCount || 0)
+      }, 0)
+    }
+    return stats
+  }, [projects])
+
+  const handleViewDetails = (projectId: string) => {
+    router.push(`/projects/${projectId}`)
+  }
+
+  const handleEditProject = (projectId: string) => {
+    router.push(`/projects/post?edit=${projectId}`)
+  }
+
+  const handleCreateProject = () => {
+    router.push("/projects/post")
+  }
+
+  // Temporary function to fix existing draft projects
+  const handleFixDraftProjects = async () => {
+    if (!user?.userId) return
+    
+    try {
+      const result = await updateDraftProjectsToActive(user.userId)
+      if (result.success) {
+        // Refresh the projects list
+        window.location.reload()
+      }
+    } catch (error) {
+      console.error('Failed to update draft projects:', error)
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="flex items-center justify-center h-96">
+            <div className="text-center">
+              <div className="relative">
+                <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-6"></div>
+                <div className="absolute inset-0 w-16 h-16 border-4 border-primary-green/20 border-b-primary-green rounded-full animate-spin mx-auto" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
+              </div>
+              <h3 className="text-xl font-semibold text-slate-800 mb-2">Loading your projects...</h3>
+              <p className="text-slate-600">Please wait while we fetch your project data</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="flex items-center justify-center h-96">
+            <Card className="bg-white border border-red-200 shadow-lg max-w-md w-full">
+              <CardContent className="p-8 text-center">
+                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <AlertCircle className="w-8 h-8 text-red-600" />
+                </div>
+                <h3 className="text-xl font-semibold text-slate-800 mb-2">Error loading projects</h3>
+                <p className="text-slate-600 mb-6">We encountered an issue while fetching your projects. Please try again.</p>
+                <Button 
+                  onClick={() => window.location.reload()} 
+                  className="bg-gradient-to-r from-primary-blue to-primary-green hover:from-primary-blue-dark hover:to-primary-green-dark text-white"
+                >
+                  Try Again
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
+      <div className="max-w-[1600px] mx-auto px-6 sm:px-8 lg:px-12 py-10">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-8">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">My Projects</h1>
-              <p className="text-gray-600 dark:text-gray-300">Manage and track all your posted projects</p>
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent mb-3">
+                My Projects
+              </h1>
+              <p className="text-lg text-slate-600">Manage and track your project portfolio</p>
             </div>
-            <Link href="/projects/post">
-              <Button className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg">
-                <Plus className="w-4 h-4 mr-2" />
-                Post New Project
+            <Button 
+              onClick={handleCreateProject}
+              size="lg"
+              className="bg-gradient-to-r from-primary-blue to-primary-green hover:from-primary-blue-dark hover:to-primary-green-dark text-white shadow-lg hover:shadow-xl transition-all duration-300 px-6 py-3"
+            >
+              <Plus className="w-5 h-5 mr-2" />
+              Post New Project
+            </Button>
+          </div>
+
+          {/* Enhanced Stats Dashboard */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+            <Card className="bg-white border border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-300">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl text-white shadow-lg">
+                      <Briefcase className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-slate-500 uppercase tracking-wide">Total Projects</p>
+                      <p className="text-3xl font-bold text-slate-800">{projectStats.total}</p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white border border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-300">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <div className="p-3 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl text-white shadow-lg">
+                      <CheckCircle className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-slate-500 uppercase tracking-wide">Active</p>
+                      <p className="text-3xl font-bold text-slate-800">{projectStats.active}</p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white border border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-300">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <div className="p-3 bg-gradient-to-br from-primary-green to-primary-green-dark rounded-xl text-white shadow-lg">
+                      <TrendingUp className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-slate-500 uppercase tracking-wide">Completed</p>
+                      <p className="text-3xl font-bold text-slate-800">{projectStats.completed}</p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white border border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-300">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <div className="p-3 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl text-white shadow-lg">
+                      <DollarSign className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-slate-500 uppercase tracking-wide">Total Budget</p>
+                      <p className="text-3xl font-bold text-slate-800">
+                        ${projectStats.totalBudget.toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white border border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-300">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <div className="p-3 bg-gradient-to-br from-cyan-500 to-cyan-600 rounded-xl text-white shadow-lg">
+                      <Users className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-slate-500 uppercase tracking-wide">Proposals</p>
+                      <p className="text-3xl font-bold text-slate-800">{projectStats.totalProposals}</p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Search and Filters */}
+          <div className="flex flex-col lg:flex-row gap-4 mb-8">
+            <div className="relative flex-1">
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
+              <Input
+                placeholder="Search projects by title, description, or skills..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-12 h-12 bg-white border-slate-200 shadow-sm focus:shadow-md transition-shadow duration-200 text-slate-700"
+              />
+            </div>
+            <div className="flex gap-3">
+              <Button variant="outline" className="h-12 bg-white border-slate-200 text-slate-700 hover:bg-slate-50 px-6">
+                <Filter className="w-4 h-4 mr-2" />
+                Filter
               </Button>
-            </Link>
-          </div>
-        </div>
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card className="shadow-lg border-0 bg-gradient-to-br from-blue-500 to-blue-600 text-white">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-blue-100 text-sm font-medium">Total Projects</p>
-                  <p className="text-2xl font-bold">{stats.total}</p>
-                </div>
-                <div className="bg-white/20 p-3 rounded-full">
-                  <Briefcase className="w-6 h-6" />
-                </div>
-              </div>
-              <div className="flex items-center mt-4 text-blue-100">
-                <TrendingUp className="w-4 h-4 mr-1" />
-                <span className="text-sm">+2 this month</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-lg border-0 bg-gradient-to-br from-purple-500 to-purple-600 text-white">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-purple-100 text-sm font-medium">Active Projects</p>
-                  <p className="text-2xl font-bold">{stats.active}</p>
-                </div>
-                <div className="bg-white/20 p-3 rounded-full">
-                  <Clock className="w-6 h-6" />
-                </div>
-              </div>
-              <div className="flex items-center mt-4 text-purple-100">
-                <Users className="w-4 h-4 mr-1" />
-                <span className="text-sm">{stats.active} in progress</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-lg border-0 bg-gradient-to-br from-green-500 to-green-600 text-white">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-green-100 text-sm font-medium">Completed</p>
-                  <p className="text-2xl font-bold">{stats.completed}</p>
-                </div>
-                <div className="bg-white/20 p-3 rounded-full">
-                  <CheckCircle className="w-6 h-6" />
-                </div>
-              </div>
-              <div className="flex items-center mt-4 text-green-100">
-                <Star className="w-4 h-4 mr-1" />
-                <span className="text-sm">4.8 avg rating</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-lg border-0 bg-gradient-to-br from-orange-500 to-orange-600 text-white">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-orange-100 text-sm font-medium">Total Spent</p>
-                  <p className="text-2xl font-bold">${stats.totalSpent.toLocaleString()}</p>
-                </div>
-                <div className="bg-white/20 p-3 rounded-full">
-                  <DollarSign className="w-6 h-6" />
-                </div>
-              </div>
-              <div className="flex items-center mt-4 text-orange-100">
-                <TrendingUp className="w-4 h-4 mr-1" />
-                <span className="text-sm">+15% this month</span>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
-            <TabsList className="grid w-full lg:w-auto grid-cols-4">
-              <TabsTrigger value="all">All Projects</TabsTrigger>
-              <TabsTrigger value="active">Active</TabsTrigger>
-              <TabsTrigger value="completed">Completed</TabsTrigger>
-              <TabsTrigger value="draft">Drafts</TabsTrigger>
-            </TabsList>
-
-            {/* Filters */}
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <Input
-                  placeholder="Search projects..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 w-full sm:w-64"
-                />
-              </div>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-full sm:w-40">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="in_progress">In Progress</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="paused">Paused</SelectItem>
-                  <SelectItem value="draft">Draft</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                <SelectTrigger className="w-full sm:w-40">
-                  <SelectValue placeholder="Category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  <SelectItem value="Web Development">Web Development</SelectItem>
-                  <SelectItem value="Design">Design</SelectItem>
-                  <SelectItem value="Digital Marketing">Digital Marketing</SelectItem>
-                  <SelectItem value="Mobile Development">Mobile Development</SelectItem>
-                </SelectContent>
-              </Select>
+              <Button variant="outline" className="h-12 bg-white border-slate-200 text-slate-700 hover:bg-slate-50 px-6">
+                <BarChart3 className="w-4 h-4 mr-2" />
+                Analytics
+              </Button>
+              {/* Temporary fix button - remove after fixing existing projects */}
+              {projectStats.draft > 0 && (
+                <Button 
+                  onClick={handleFixDraftProjects}
+                  variant="outline" 
+                  className="h-12 bg-yellow-50 border-yellow-200 text-yellow-700 hover:bg-yellow-100 px-6"
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Fix Draft Projects ({projectStats.draft})
+                </Button>
+              )}
             </div>
           </div>
+        </div>
+
+        {/* Projects Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="bg-white border border-slate-200 shadow-sm p-1 h-12 rounded-lg mb-8">
+            <TabsTrigger value="all" className="h-10 px-6 text-slate-600 data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 data-[state=active]:border-blue-200">
+              All Projects ({projectStats.total})
+            </TabsTrigger>
+            <TabsTrigger value="active" className="h-10 px-6 text-slate-600 data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700 data-[state=active]:border-emerald-200">
+              Active ({projectStats.active})
+            </TabsTrigger>
+            <TabsTrigger value="completed" className="h-10 px-6 text-slate-600 data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 data-[state=active]:border-blue-200">
+              Completed ({projectStats.completed})
+            </TabsTrigger>
+            <TabsTrigger value="draft" className="h-10 px-6 text-slate-600 data-[state=active]:bg-slate-50 data-[state=active]:text-slate-700 data-[state=active]:border-slate-200">
+              Drafts ({projectStats.draft})
+            </TabsTrigger>
+          </TabsList>
 
           <TabsContent value={activeTab} className="space-y-6">
             {filteredProjects.length === 0 ? (
-              <Card className="shadow-lg border-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
-                <CardContent className="text-center py-12">
-                  <Briefcase className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No projects found</h3>
-                  <p className="text-gray-600 dark:text-gray-300 mb-6">
-                    {searchQuery || statusFilter !== "all" || categoryFilter !== "all"
-                      ? "Try adjusting your filters"
-                      : "Get started by posting your first project"}
+              <Card className="bg-white border border-slate-200 shadow-sm">
+                <CardContent className="p-16 text-center">
+                  <div className="mx-auto w-24 h-24 bg-gradient-to-br from-slate-100 to-slate-200 rounded-2xl flex items-center justify-center mb-6">
+                    <Briefcase className="w-12 h-12 text-slate-400" />
+                  </div>
+                  <h3 className="text-2xl font-bold text-slate-800 mb-3">
+                    {activeTab === "all" 
+                      ? "No projects yet" 
+                      : `No ${activeTab} projects`
+                    }
+                  </h3>
+                  <p className="text-slate-600 mb-8 max-w-md mx-auto leading-relaxed">
+                    {activeTab === "all"
+                      ? "Start building your portfolio by posting your first project and connecting with talented freelancers."
+                      : `You don't have any ${activeTab} projects at the moment. Check back later or explore other tabs.`
+                    }
                   </p>
-                  {!searchQuery && statusFilter === "all" && categoryFilter === "all" && (
-                    <Link href="/projects/post">
-                      <Button>
-                        <Plus className="w-4 h-4 mr-2" />
-                        Post Your First Project
-                      </Button>
-                    </Link>
+                  {activeTab === "all" && (
+                    <Button 
+                      onClick={handleCreateProject}
+                      size="lg"
+                      className="bg-gradient-to-r from-primary-blue to-primary-green hover:from-primary-blue-dark hover:to-primary-green-dark text-white shadow-lg hover:shadow-xl transition-all duration-300 px-8 py-3"
+                    >
+                      <Plus className="w-5 h-5 mr-2" />
+                      Post Your First Project
+                    </Button>
                   )}
                 </CardContent>
               </Card>
             ) : (
-              <div className="space-y-6">
-                {filteredProjects.map((project) => (
-                  <Card
-                    key={project.id}
-                    className="shadow-lg border-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm hover:shadow-xl transition-all duration-300"
-                  >
-                    <CardContent className="p-6">
-                      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between space-y-4 lg:space-y-0">
-                        <div className="flex-1 lg:mr-6">
-                          <div className="flex items-start justify-between mb-3">
-                            <div className="flex-1">
-                              <div className="flex items-center space-x-3 mb-2">
-                                <h3 className="text-xl font-semibold text-gray-900 dark:text-white hover:text-blue-600 cursor-pointer">
-                                  {project.title}
-                                </h3>
-                                <Badge
-                                  variant="outline"
-                                  className={`${getStatusColor(project.status)} flex items-center space-x-1`}
-                                >
-                                  {getStatusIcon(project.status)}
-                                  <span className="capitalize">{project.status.replace("_", " ")}</span>
-                                </Badge>
-                              </div>
-                              <p className="text-gray-600 dark:text-gray-300 mb-4 line-clamp-2">
-                                {project.description}
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="flex flex-wrap gap-2 mb-4">
-                            {project.skills.slice(0, 5).map((skill, index) => (
-                              <Badge key={index} variant="secondary" className="text-xs">
-                                {skill}
-                              </Badge>
-                            ))}
-                            {project.skills.length > 5 && (
-                              <Badge variant="outline" className="text-xs">
-                                +{project.skills.length - 5} more
-                              </Badge>
-                            )}
-                          </div>
-
-                          {project.hired && (
-                            <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg mb-4">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center space-x-3">
-                                  <Image
-                                    src={project.hired.freelancer.avatar || "/placeholder.svg"}
-                                    alt={project.hired.freelancer.name}
-                                    width={32}
-                                    height={32}
-                                    className="w-8 h-8 rounded-full object-cover"
-                                  />
-                                  <div>
-                                    <p className="font-medium text-sm">{project.hired.freelancer.name}</p>
-                                    <div className="flex items-center space-x-2 text-xs text-gray-600 dark:text-gray-300">
-                                      <Star className="w-3 h-3 text-yellow-400 fill-current" />
-                                      <span>{project.hired.freelancer.rating}</span>
-                                      <span>•</span>
-                                      <span>${project.hired.freelancer.hourlyRate}/hr</span>
-                                    </div>
-                                  </div>
-                                </div>
-                                {project.status === "in_progress" && (
-                                  <div className="text-right">
-                                    <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                      {project.progress}% Complete
-                                    </div>
-                                    <Progress value={project.progress} className="w-24 mt-1" />
-                                  </div>
-                                )}
-                              </div>
-                              {project.status === "completed" && project.rating && (
-                                <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-700">
-                                  <div className="flex items-center space-x-2 mb-2">
-                                    <div className="flex items-center">
-                                      {[...Array(5)].map((_, i) => (
-                                        <Star
-                                          key={i}
-                                          className={`w-4 h-4 ${
-                                            i < project.rating ? "text-yellow-400 fill-current" : "text-gray-300"
-                                          }`}
-                                        />
-                                      ))}
-                                    </div>
-                                    <span className="text-sm font-medium">{project.rating}/5</span>
-                                  </div>
-                                  {project.feedback && (
-                                    <p className="text-sm text-gray-600 dark:text-gray-300 italic">
-                                      "{project.feedback}"
-                                    </p>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          )}
-
-                          <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 dark:text-gray-300">
-                            <div className="flex items-center space-x-1">
-                              <DollarSign className="w-4 h-4" />
-                              <span className="font-medium">
-                                {project.budget.type === "fixed"
-                                  ? `$${project.budget.amount.toLocaleString()} Fixed`
-                                  : `$${project.budget.min}-${project.budget.max}/hr`}
-                              </span>
-                            </div>
-                            {project.proposals > 0 && (
-                              <div className="flex items-center space-x-1">
-                                <Users className="w-4 h-4" />
-                                <span>{project.proposals} proposals</span>
-                              </div>
-                            )}
-                            {project.messagesCount > 0 && (
-                              <div className="flex items-center space-x-1">
-                                <MessageSquare className="w-4 h-4" />
-                                <span>{project.messagesCount} messages</span>
-                              </div>
-                            )}
-                            {project.postedDate && (
-                              <div className="flex items-center space-x-1">
-                                <Calendar className="w-4 h-4" />
-                                <span>Posted {project.postedDate}</span>
-                              </div>
-                            )}
-                            <div className="flex items-center space-x-1">
-                              <MapPin className="w-4 h-4" />
-                              <span>{project.category}</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-col space-y-3 lg:w-48">
-                          {project.totalSpent > 0 && (
-                            <div className="text-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                              <div className="text-lg font-bold text-green-600">
-                                ${project.totalSpent.toLocaleString()}
-                              </div>
-                              <div className="text-xs text-green-700 dark:text-green-300">Total Spent</div>
-                            </div>
-                          )}
-
-                          <div className="flex flex-col space-y-2">
-                            <Link href={`/client/projects/${project.id}`}>
-                              <Button className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white">
-                                <Eye className="w-4 h-4 mr-2" />
-                                View Details
-                              </Button>
-                            </Link>
-
-                            {project.hired && (
-                              <Link href={`/messages?user=${project.hired.freelancer.name}`}>
-                                <Button variant="outline" className="w-full bg-transparent">
-                                  <MessageSquare className="w-4 h-4 mr-2" />
-                                  Message
-                                </Button>
-                              </Link>
-                            )}
-
-                            {project.status === "draft" && (
-                              <Button variant="outline" className="w-full bg-transparent">
-                                Edit Draft
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8">
+                {filteredProjects.map((project: any) => (
+                  <ProjectCard
+                    key={project.projectId}
+                    project={project}
+                    onViewDetails={handleViewDetails}
+                    onEdit={handleEditProject}
+                  />
                 ))}
               </div>
             )}
