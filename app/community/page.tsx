@@ -305,7 +305,7 @@ export default function CommunityPage() {
                       <CardContent className="p-6">
                         <div className="flex items-start space-x-4">
                           <Avatar className="w-12 h-12">
-                            <AvatarImage src={discussion.avatar || "/placeholder.svg"} alt={discussion.author} />
+                            <AvatarImage src={discussion.avatar || "/placeholder.svg"} alt={discussion.author} className="object-cover" />
                             <AvatarFallback>
                               {discussion.author
                                 .split(" ")
@@ -363,7 +363,7 @@ export default function CommunityPage() {
                       {topContributors.map((contributor, index) => (
                         <div key={index} className="flex items-center space-x-3">
                           <Avatar className="w-10 h-10">
-                            <AvatarImage src={contributor.avatar || "/placeholder.svg"} alt={contributor.name} />
+                            <AvatarImage src={contributor.avatar || "/placeholder.svg"} alt={contributor.name} className="object-cover" />
                             <AvatarFallback>
                               {contributor.name
                                 .split(" ")
@@ -498,7 +498,7 @@ export default function CommunityPage() {
                     <CardContent className="p-6">
                       <div className="flex items-start space-x-4">
                         <Avatar className="w-12 h-12">
-                          <AvatarImage src={story.avatar || "/placeholder.svg"} alt={story.author} />
+                          <AvatarImage src={story.avatar || "/placeholder.svg"} alt={story.author} className="object-cover" />
                           <AvatarFallback>
                             {story.author
                               .split(" ")
