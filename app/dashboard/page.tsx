@@ -1,6 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { useSelector } from "react-redux"
+import { RootState } from "@/lib/redux/store"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -143,6 +146,27 @@ const recentProposals = [
 
 export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState("overview")
+  const { user } = useSelector((state: RootState) => state.auth)
+  const router = useRouter()
+
+  // Redirect clients to their specific dashboard
+  useEffect(() => {
+    if (user && user.role === 'client') {
+      router.push('/client/dashboard')
+      return
+    }
+    if (user && user.role === 'admin') {
+      router.push('/admin')
+      return
+    }
+  }, [user, router])
+
+  // Show loading or redirect for non-freelancers
+  if (!user || user.role !== 'freelancer') {
+    return <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div>Redirecting...</div>
+    </div>
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
