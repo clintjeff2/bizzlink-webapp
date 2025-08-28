@@ -47,7 +47,7 @@ export default function HelpCenterPage() {
       title: "Email Support",
       description: "Send us a detailed message about your issue",
       icon: Mail,
-      color: "bg-purple-500",
+      color: "bg-green-500",
       availability: "24/7",
       responseTime: "< 4 hours",
     },
@@ -79,7 +79,7 @@ export default function HelpCenterPage() {
     {
       title: "Payments & Billing",
       icon: CreditCard,
-      color: "bg-purple-500",
+      color: "bg-green-500",
       articles: 32,
       description: "Payment methods, invoicing, and billing",
     },
@@ -211,7 +211,7 @@ export default function HelpCenterPage() {
       <Navigation />
 
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 text-white py-20">
+      <section className="bg-gradient-to-br from-blue-600 via-teal-600 to-green-700 text-white py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <h1 className="text-4xl md:text-6xl font-bold mb-6">Help Center</h1>
