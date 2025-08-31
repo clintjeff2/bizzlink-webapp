@@ -34,6 +34,7 @@ export function AuthProviderRedux({ children }: { children: React.ReactNode }) {
         // User is signed in, get their data from Firestore
         const userData = await getUserData(firebaseUser.uid)
         if (userData) {
+          console.log(userData, "Jeffff")
           dispatch(setUser(userData))
         }
       } else {
@@ -59,9 +60,16 @@ export function AuthProviderRedux({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     try {
-      await logoutMutation().unwrap()
-      // Redirect to home page after logout
-      router.push('/')
+      const result = await logoutMutation().unwrap()
+      if (result.success) {
+        // Clear any local storage items if needed
+        localStorage.removeItem('bizzlink_user_onboarding')
+        localStorage.removeItem('bizzlink_signup_progress')
+        localStorage.removeItem('bizzlink_user')
+        
+        // Redirect to home page after logout
+        router.push('/')
+      }
     } catch (error) {
       console.error('Logout failed:', error)
     }
@@ -79,5 +87,7 @@ export function useAuth() {
   if (context === undefined) {
     throw new Error("useAuth must be used within an AuthProvider")
   }
+
+  console.log(context, "Context JEFF")
   return context
 }
