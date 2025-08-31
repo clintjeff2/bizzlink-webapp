@@ -65,7 +65,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             localStorage.setItem("bizzlink_user", JSON.stringify(fullUser))
           }
         } catch (error) {
-          console.error('Error promoting onboarding user:', error)
+          // Error promoting onboarding user
         }
       } else if (signupData) {
         try {
@@ -87,7 +87,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             localStorage.setItem("bizzlink_user", JSON.stringify(fullUser))
           }
         } catch (error) {
-          console.error('Error promoting signup user:', error)
+          // Error promoting signup user
         }
       }
     }
@@ -156,7 +156,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           router.push("/dashboard")
       }
     } catch (error) {
-      console.error("Login failed:", error)
+      // Login failed
       throw error
     } finally {
       setLoading(false)
@@ -199,7 +199,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           router.push("/dashboard")
       }
     } catch (error) {
-      console.error("Signup failed:", error)
+      // Signup failed
       throw error
     } finally {
       setLoading(false)
