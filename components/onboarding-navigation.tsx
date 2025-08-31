@@ -49,7 +49,7 @@ export function OnboardingNavigation() {
           })
         }
       } catch (error) {
-        console.error('Error parsing onboarding data:', error)
+        // Error parsing onboarding data
       }
     } else if (signupData) {
       try {
@@ -66,7 +66,7 @@ export function OnboardingNavigation() {
           })
         }
       } catch (error) {
-        console.error('Error parsing signup data:', error)
+        // Error parsing signup data
       }
     }
   }, [])
