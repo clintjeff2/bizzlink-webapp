@@ -455,7 +455,7 @@ export function Navigation() {
               return
             }
           } catch (error) {
-            console.error('Error parsing onboarding data:', error)
+            // Error parsing onboarding data
           }
         }
         
@@ -476,7 +476,7 @@ export function Navigation() {
               return
             }
           } catch (error) {
-            console.error('Error parsing signup data:', error)
+            // Error parsing signup data
           }
         }
         
@@ -509,16 +509,6 @@ export function Navigation() {
   }
 
   // Determine which navigation to show based on user state
-  // Debug logging to help troubleshoot navigation state
-  if (process.env.NODE_ENV === 'development') {
-    console.log('Navigation state:', {
-      user: user ? { email: user?.email, role: user?.role } : null,
-      onboardingUser: onboardingUser ? { email: onboardingUser?.email, role: onboardingUser?.role, isOnboarding: onboardingUser?.isOnboarding } : null,
-      localStorage_onboarding: typeof window !== 'undefined' ? (localStorage.getItem('bizzlink_user_onboarding') ? 'exists' : 'null') : 'server',
-      localStorage_signup: typeof window !== 'undefined' ? (localStorage.getItem('bizzlink_signup_progress') ? 'exists' : 'null') : 'server',
-      isMounted: mounted
-    })
-  }
 
   // Don't render navigation until mounted to prevent hydration mismatches
   if (!mounted) {
@@ -538,7 +528,6 @@ export function Navigation() {
   }
 
   if (user) {
-    console.log(user, "User Data")
     // User is fully authenticated
     return <AuthenticatedNav user={user} logout={logout} />
   } else if (onboardingUser) {
