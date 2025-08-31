@@ -30,7 +30,7 @@ export function GoogleAuth({ mode, className }: GoogleAuthProps) {
         router.push('/dashboard')
       }
     } catch (error: any) {
-      console.error("Google authentication failed:", error)
+      // Google authentication failed
       // You might want to show a toast or error message here
     } finally {
       setIsLoading(false)
