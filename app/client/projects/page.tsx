@@ -55,9 +55,7 @@ const ProjectCard = ({ project, onViewDetails, onEdit }: any) => {
   }
 
   const formatBudget = (project: any) => {
-    console.log("Budget data for project:", project.title, project.budget)
-    
-    // Handle different budget structures
+    // Format budget based on project budget structure
     if (!project.budget) return 'Budget not set'
     
     const currency = project.budget.currency || 'USD'
@@ -285,12 +283,7 @@ export default function ClientProjectsPage() {
   
   const { user } = useSelector((state: RootState) => state.auth)
   
-  // Enhanced Debug Logging
-  console.log("=== CLIENT PROJECTS PAGE DEBUG ===")
-  console.log("1. Current user object:", user)
-  console.log("2. User ID for query:", user?.userId)
-  console.log("3. User role:", user?.role)
-  console.log("4. Is user authenticated:", !!user)
+  // Fetch user's projects based on their user ID
   
   const {
     data: projects = [],
@@ -302,34 +295,7 @@ export default function ClientProjectsPage() {
     skip: !user?.userId
   })
   
-  // Enhanced Debug Logging for Query Results
-  console.log("5. Projects query skipped:", !user?.userId)
-  console.log("6. Projects query result:", { 
-    projectsCount: projects.length, 
-    projects: projects.slice(0, 2), // Log first 2 projects only
-    isLoading, 
-    error 
-  })
-  console.log("7. First project details (if exists):")
-  if (projects[0]) {
-    console.log("   - Project ID:", projects[0].projectId)
-    console.log("   - Client ID:", projects[0].clientId)
-    console.log("   - Title:", projects[0].title)
-    console.log("   - Status:", projects[0].status)
-    console.log("   - Budget structure:", projects[0].budget)
-    console.log("   - Timeline structure:", projects[0].timeline)
-    console.log("   - Created at:", projects[0].createdAt)
-    console.log("   - Skills:", projects[0].requirements?.skills)
-    console.log("   - Category:", projects[0].category)
-  }
-  
-  // Log all project statuses to understand the issue
-  console.log("8. All project statuses:")
-  projects.forEach((project: any, index: number) => {
-    console.log(`   Project ${index + 1}: "${project.title}" - Status: "${project.status}"`)
-  })
-  
-  console.log("===============================")
+  // Proceed with filtering and rendering projects
 
   const filteredProjects = useMemo(() => {
     let filtered = projects
