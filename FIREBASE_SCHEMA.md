@@ -694,7 +694,7 @@ Mobile apps should implement the same interfaces for consistency:
 
 ### Storage Integration
 
-The platform uses Firebase Storage for file management, particularly for profile images:
+The platform uses Firebase Storage for file management:
 
 #### Profile Image Upload
 ```typescript
@@ -744,6 +744,39 @@ useUpdateUserLocationAndProfileMutation({
     profileImageUrl: "https://storage.firebase.com/..." // After upload
   }
 })
+```
+
+#### Proposal Attachments Upload
+
+```typescript
+// Upload proposal attachment files
+import { proposalAttachmentService } from '@/lib/services/storage/proposalAttachmentService';
+
+// Upload a single file
+const uploadResult = await proposalAttachmentService.uploadFile(
+  file,  // File object 
+  projectId,
+  (progress) => {
+    console.log(`Upload progress: ${progress}%`);
+  }
+);
+
+console.log(`File uploaded: ${uploadResult.fileName} -> ${uploadResult.fileUrl}`);
+
+// Upload multiple files with progress tracking
+const results = await proposalAttachmentService.uploadMultipleFiles(
+  files, // Array of File objects
+  projectId,
+  (fileName, progress) => {
+    console.log(`Upload progress for ${fileName}: ${progress}%`);
+  }
+);
+
+// Validate files before upload
+const validation = proposalAttachmentService.validateFile(file);
+if (!validation.valid) {
+  console.error(validation.error);
+}
 ```
 
 ## Firebase Timestamp Serialization
