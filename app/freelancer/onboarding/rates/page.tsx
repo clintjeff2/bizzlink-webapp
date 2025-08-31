@@ -38,6 +38,22 @@ export default function RatesPage() {
     hasData 
   } = useOnboardingData()
   
+  // Helper function to get currency symbol
+  const getCurrencySymbol = (currencyCode: string) => {
+    switch(currencyCode) {
+      case 'USD':
+      case 'CAD':
+      case 'AUD':
+        return '$';
+      case 'EUR':
+        return '€';
+      case 'GBP':
+        return '£';
+      default:
+        return '$';
+    }
+  }
+  
   const [pricingModel, setPricingModel] = useState("")
   const [hourlyRate, setHourlyRate] = useState("")
   const [currency, setCurrency] = useState("USD")
@@ -81,8 +97,9 @@ export default function RatesPage() {
     try {
       setIsSaving(true)
       
-      // Format hourly rate with currency
-      const formattedRate = `${currency === 'USD' ? '$' : currency === 'EUR' ? '€' : '£'} ${hourlyRate}`
+      // Format hourly rate with the correct currency symbol
+      const currencySymbol = getCurrencySymbol(currency);
+      const formattedRate = `${currencySymbol}${hourlyRate}`;
       
       const success = await saveRates(formattedRate, formData.professionalTitle, formData.overview)
       
@@ -269,7 +286,13 @@ export default function RatesPage() {
                     Hourly Rate *
                   </Label>
                   <div className="relative">
-                    <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                    {currency === 'USD' || currency === 'CAD' || currency === 'AUD' ? (
+                      <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                    ) : (
+                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-lg font-medium">
+                        {getCurrencySymbol(currency)}
+                      </span>
+                    )}
                     <Input
                       id="hourlyRate"
                       type="number"
@@ -294,18 +317,22 @@ export default function RatesPage() {
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span className="text-gray-600">Your rate:</span>
-                      <span className="font-medium">${hourlyRate || "0"}/hr</span>
+                      <span className="font-medium">
+                        {getCurrencySymbol(currency)}{hourlyRate || "0"}/hr
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Platform fee (10%):</span>
                       <span className="text-red-600">
-                        -${((Number.parseFloat(hourlyRate) || 0) * 0.1).toFixed(2)}/hr
+                        -{getCurrencySymbol(currency)}
+                        {((Number.parseFloat(hourlyRate) || 0) * 0.1).toFixed(2)}/hr
                       </span>
                     </div>
                     <div className="border-t pt-2 flex justify-between font-semibold">
                       <span>You'll receive:</span>
                       <span className="text-green-600">
-                        ${((Number.parseFloat(hourlyRate) || 0) * 0.9).toFixed(2)}/hr
+                        {getCurrencySymbol(currency)}
+                        {((Number.parseFloat(hourlyRate) || 0) * 0.9).toFixed(2)}/hr
                       </span>
                     </div>
                   </div>
@@ -327,7 +354,13 @@ export default function RatesPage() {
                     Minimum Project Value
                   </Label>
                   <div className="relative">
-                    <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                    {currency === 'USD' || currency === 'CAD' || currency === 'AUD' ? (
+                      <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                    ) : (
+                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-lg font-medium">
+                        {getCurrencySymbol(currency)}
+                      </span>
+                    )}
                     <Input
                       id="minimumProject"
                       type="number"
