@@ -51,13 +51,32 @@ export {
   proposalSlice,
   setLoading as setProposalLoading,
   setProposals,
-  setSentProposals,
-  setReceivedProposals,
-  addProposal,
-  updateProposal,
-  setError as setProposalError
+  setCurrentProposal,
+  clearCurrentProposal,
+  updateProposalStats,
+  setError as setProposalError,
+  fetchFreelancerProposals,
+  fetchProposal,
+  updateProposalStatus,
+  withdrawProposal,
+  subscribeToFreelancerProposals,
+  subscribeToProposal
 } from './slices/proposalSlice'
 export type { Proposal } from './slices/proposalSlice'
+
+// Proposal selectors
+export {
+  selectAllProposals,
+  selectCurrentProposal,
+  selectProposalLoading,
+  selectProposalError,
+  selectProposalStats,
+  selectSubmittedProposals,
+  selectShortlistedProposals,
+  selectAcceptedProposals,
+  selectRejectedProposals,
+  selectWithdrawnProposals
+} from './selectors/proposalSelectors'
 
 // Signup slice
 export {
