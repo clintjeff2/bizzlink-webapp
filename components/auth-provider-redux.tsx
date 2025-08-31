@@ -34,7 +34,6 @@ export function AuthProviderRedux({ children }: { children: React.ReactNode }) {
         // User is signed in, get their data from Firestore
         const userData = await getUserData(firebaseUser.uid)
         if (userData) {
-          console.log(userData, "Jeffff")
           dispatch(setUser(userData))
         }
       } else {
@@ -88,6 +87,5 @@ export function useAuth() {
     throw new Error("useAuth must be used within an AuthProvider")
   }
 
-  console.log(context, "Context JEFF")
   return context
 }
