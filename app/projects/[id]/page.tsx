@@ -23,16 +23,16 @@ import {
   Download,
 } from "lucide-react"
 import { Navigation } from "@/components/navigation"
-import { useSelector } from "react-redux"
-import { RootState } from "@/lib/redux/store"
+import { useAppSelector } from "@/lib/redux/hooks"
 import { useGetProjectQuery } from "@/lib/redux/api/firebaseApi"
 import Link from "next/link"
 import Image from "next/image"
+import FreelancerProjectAction from "@/components/freelancer-project-action"
 
 export default function ProjectDetailsPage() {
   const { id } = useParams()
   const router = useRouter()
-  const { user } = useSelector((state: RootState) => state.auth)
+  const { user } = useAppSelector((state) => state.auth)
   
   // Enhanced Debug Logging
   console.log("=== PROJECT DETAILS PAGE DEBUG ===")
@@ -376,10 +376,22 @@ export default function ProjectDetailsPage() {
                   </div>
                   
                   {!isOwner && (
-                    <Button className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-4 text-base shadow-lg hover:shadow-xl transition-all duration-200">
-                      <MessageSquare className="w-5 h-5 mr-3" />
-                      Contact Client
-                    </Button>
+                    <div className="space-y-4">
+                      <Button className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-4 text-base shadow-lg hover:shadow-xl transition-all duration-200">
+                        <MessageSquare className="w-5 h-5 mr-3" />
+                        Contact Client
+                      </Button>
+                      
+                      {user?.role === 'freelancer' && (
+                        <>
+                          {console.log('ProjectDetailsPage - Rendering FreelancerProjectAction with props:', {
+                            projectId: project.projectId,
+                            userId: user.userId
+                          })}
+                          <FreelancerProjectAction projectId={project.projectId} userId={user.userId} />
+                        </>
+                      )}
+                    </div>
                   )}
                 </div>
               </CardContent>
