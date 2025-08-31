@@ -30,7 +30,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className={`${fontFamily.variable} font-sans`}>
+      <body suppressHydrationWarning className={`${fontFamily.variable} font-sans`}>
         <ReduxProvider>
           <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
             <AuthProviderRedux>{children}</AuthProviderRedux>
