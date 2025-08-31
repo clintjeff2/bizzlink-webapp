@@ -415,11 +415,11 @@ export const firebaseApi = createApi({
       invalidatesTags: ['User'],
     }),
 
-    logout: builder.mutation<void, void>({
+    logout: builder.mutation<{ success: boolean }, void>({
       queryFn: async () => {
         try {
           await signOut(auth)
-          return { data: undefined }
+          return { data: { success: true } }
         } catch (error: any) {
           return { error: { status: 'CUSTOM_ERROR', error: error.message } }
         }
