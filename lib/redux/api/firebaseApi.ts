@@ -11,6 +11,24 @@ import {
   sendEmailVerification,
   signInAnonymously
 } from 'firebase/auth'
+
+// Create a cache for Firestore documents to handle non-serializable data
+const documentCache = new Map();
+
+// Cache cleanup function - call this periodically or when cache gets too large
+const cleanupDocumentCache = () => {
+  // Only keep the 50 most recent documents to prevent memory leaks
+  if (documentCache.size > 50) {
+    // Convert to array, sort by insertion time (if you added timestamps)
+    // and delete oldest entries
+    const entries = Array.from(documentCache.entries());
+    const toDelete = entries.slice(0, entries.length - 50);
+    
+    toDelete.forEach(([key]) => {
+      documentCache.delete(key);
+    });
+  }
+};
 import { 
   doc, 
   setDoc, 
@@ -121,34 +139,22 @@ const serializeProject = (project: any): Project => {
 
 // Helper function to convert string dates to Timestamps for Firestore storage
 const deserializeProjectForStorage = (project: any): any => {
-  console.log('🔧 Deserializing project for storage:', project)
+  // Convert project for Firestore storage
   const result = { ...project }
   
   // Convert timeline dates to Timestamps if they're strings or Date objects
   if (result.timeline) {
-    console.log('🔧 Timeline before conversion:', result.timeline)
-    
     if (typeof result.timeline.startDate === 'string') {
-      console.log('🔧 Converting string startDate to Timestamp')
       result.timeline.startDate = Timestamp.fromDate(new Date(result.timeline.startDate))
     } else if (result.timeline.startDate instanceof Date) {
-      console.log('🔧 Converting Date startDate to Timestamp')
       result.timeline.startDate = Timestamp.fromDate(result.timeline.startDate)
-    } else {
-      console.log('🔧 StartDate is already a Timestamp or other type:', typeof result.timeline.startDate)
     }
     
     if (typeof result.timeline.endDate === 'string') {
-      console.log('🔧 Converting string endDate to Timestamp')
       result.timeline.endDate = Timestamp.fromDate(new Date(result.timeline.endDate))
     } else if (result.timeline.endDate instanceof Date) {
-      console.log('🔧 Converting Date endDate to Timestamp')
       result.timeline.endDate = Timestamp.fromDate(result.timeline.endDate)
-    } else {
-      console.log('🔧 EndDate is already a Timestamp or other type:', typeof result.timeline.endDate)
     }
-    
-    console.log('🔧 Timeline after conversion:', result.timeline)
   }
   
   // Convert milestone dates to Timestamps
@@ -175,7 +181,7 @@ const deserializeProjectForStorage = (project: any): any => {
     }))
   }
   
-  console.log('🔧 Result after deserialization:', result)
+  // Return the deserialized project
   return result
 }
 
@@ -488,45 +494,234 @@ export const firebaseApi = createApi({
     }),
 
     // Project endpoints
-    getProjects: builder.query<Project[], { 
+    getProjects: builder.query<{ projects: Project[], lastDoc: any }, { 
       limit?: number; 
       status?: string; 
-      skills?: string[]; 
+      skills?: string[];
+      categories?: string[];
+      experienceLevel?: string;
+      minBudget?: number;
+      maxBudget?: number;
+      freelancerId?: string;
+      matchFreelancerSkills?: boolean;
       lastDoc?: any 
     }>({
-      queryFn: async ({ limit: queryLimit = 10, status, skills, lastDoc }) => {
+      queryFn: async ({ 
+        limit: queryLimit = 10, 
+        status = 'active', 
+        skills, 
+        categories,
+        experienceLevel,
+        minBudget,
+        maxBudget,
+        freelancerId,
+        matchFreelancerSkills = false,
+        lastDoc 
+      }) => {
         try {
+          // Start projects query with the provided parameters
+
+          // Start with base query - always filter by active status for public listings
+          // This ensures we only show projects that are open for proposals
           let q = query(
             collection(db, 'projects'),
+            where('status', '==', status),
             orderBy('createdAt', 'desc'),
             limit(queryLimit)
           )
           
-          if (status) {
-            q = query(q, where('status', '==', status))
+          // Apply additional filters
+          if (categories && categories.length > 0) {
+            // Firebase doesn't support multiple 'where' clauses on different fields
+            // with array-contains-any, so we'll filter by category in memory if needed
+            q = query(q, where('category', 'in', categories))
           }
           
-          if (skills && skills.length > 0) {
-            q = query(q, where('skills', 'array-contains-any', skills))
+          if (skills && skills.length > 0 && !matchFreelancerSkills) {
+            q = query(q, where('requirements.skills', 'array-contains-any', skills))
           }
+          
+          // Experience level is no longer part of the initial query filter
+          // It will be applied as a client-side filter instead
           
           if (lastDoc) {
-            q = query(q, startAfter(lastDoc))
+            // If lastDoc is a string (document ID), retrieve the actual DocumentSnapshot from cache
+            const actualLastDoc = typeof lastDoc === 'string' ? documentCache.get(lastDoc) : lastDoc;
+            if (actualLastDoc) {
+              q = query(q, startAfter(actualLastDoc));
+            }
           }
           
+          // Fetch freelancer data if we need to match by freelancer skills
+          let freelancerData = null;
+          if (freelancerId && matchFreelancerSkills) {
+            const userDoc = await getDoc(doc(db, 'users', freelancerId));
+            if (userDoc.exists()) {
+              freelancerData = userDoc.data();
+              // Freelancer data fetched successfully
+            }
+          }
+          
+          // Execute query
           const querySnapshot = await getDocs(q)
-          const projects = querySnapshot.docs.map(doc => {
+          // Query execution completed
+          
+          // Get projects and apply any in-memory filtering
+          let projects = querySnapshot.docs.map(doc => {
             const data = doc.data()
             const project = {
               projectId: doc.id,
               ...data
             } as Project
             
-            // Serialize each project before returning to Redux
+            // Serialize project for Redux
             return serializeProject(project)
           })
           
-          return { data: projects }
+          // Apply budget filtering in memory since Firebase doesn't easily support
+          // complex filtering on nested fields
+          if (minBudget !== undefined || maxBudget !== undefined) {
+            projects = projects.filter(project => {
+              const projectBudget = project.budget.type === 'fixed' 
+                ? project.budget.amount 
+                : project.budget.maxAmount;
+                
+              const meetsMinBudget = minBudget !== undefined ? projectBudget >= minBudget : true;
+              const meetsMaxBudget = maxBudget !== undefined ? projectBudget <= maxBudget : true;
+              
+              return meetsMinBudget && meetsMaxBudget;
+            });
+          }
+          
+          // Filter by freelancer skills if requested
+          if (freelancerId && matchFreelancerSkills && freelancerData) {
+            // First, try to match projects based on skills/specialties
+            const matchedProjects = projects.filter(project => {
+              // Extract freelancer skills and specialties
+              const freelancerSkills = freelancerData.skills?.map((s: any) => s.text.toLowerCase()) || [];
+              const freelancerSpecialties = freelancerData.specialties?.map((s: string) => s.toLowerCase()) || [];
+              
+              // Check if project skills match freelancer skills or specialties
+              const projectSkills = project.requirements?.skills?.map(s => s.toLowerCase()) || [];
+              const projectCategory = project.category?.toLowerCase();
+              const projectSubcategory = project.subcategory?.toLowerCase();
+              
+              // Calculate matches:
+              // 1. Check if any project skills match freelancer skills (more relaxed matching)
+              const hasSkillMatch = projectSkills.some(skill => 
+                freelancerSkills.some((fSkill: string) => 
+                  fSkill.includes(skill) || skill.includes(fSkill)
+                )
+              );
+              
+              // 2. Check if project category/subcategory matches freelancer specialties
+              // More relaxed matching using partial matches
+              const hasSpecialtyMatch = 
+                (projectCategory && freelancerSpecialties.some((specialty: string) => 
+                  specialty.includes(projectCategory) || 
+                  projectCategory.includes(specialty))) || 
+                (projectSubcategory && freelancerSpecialties.some((specialty: string) => 
+                  specialty.includes(projectSubcategory) || 
+                  projectSubcategory.includes(specialty)));
+              
+              // 3. Check experience level match - instead of filtering, use it for scoring
+              const requiredLevel = project.requirements?.experienceLevel || 'entry';
+              const freelancerLevel = determineFreelancerLevel(freelancerData);
+              const hasLevelMatch = 
+                requiredLevel === 'entry' || 
+                (requiredLevel === 'intermediate' && (freelancerLevel === 'intermediate' || freelancerLevel === 'expert')) ||
+                (requiredLevel === 'expert' && freelancerLevel === 'expert');
+              
+              // Consider a project a good match if it matches skills OR specialties
+              // We no longer filter by experience level, just skill/specialty match
+              return hasSkillMatch || hasSpecialtyMatch;
+            });
+            
+            // If we found skill or specialty matches, use them to boost those projects to the top
+            // but don't exclude non-matching projects entirely
+            if (matchedProjects.length > 0) {
+              // Sort projects so matched ones appear first
+              const nonMatchedProjects = projects.filter(
+                project => !matchedProjects.some(p => p.projectId === project.projectId)
+              );
+              
+              // Combine matched projects (first) with non-matched projects (after)
+              projects = [...matchedProjects, ...nonMatchedProjects];
+            }
+            
+            // Add a relevance score to each project for better sorting
+            projects = projects.map(project => {
+              const requiredLevel = project.requirements?.experienceLevel || 'entry';
+              const freelancerLevel = determineFreelancerLevel(freelancerData);
+              
+              // Check if level matches (freelancer meets or exceeds required level)
+              const hasLevelMatch = 
+                requiredLevel === 'entry' || 
+                (requiredLevel === 'intermediate' && (freelancerLevel === 'intermediate' || freelancerLevel === 'expert')) ||
+                (requiredLevel === 'expert' && freelancerLevel === 'expert');
+              
+              // Calculate relevance score (higher is better)
+              const relevanceScore = (hasLevelMatch ? 100 : 0) + 
+                (matchedProjects.some(p => p.projectId === project.projectId) ? 200 : 0);
+              
+              return {
+                ...project,
+                relevanceScore
+              };
+            });
+          }
+          
+          // Filter out projects that already have a hired freelancer
+          projects = projects.filter(project => !project.hiredFreelancerId);
+          
+          // Project filtering completed
+          
+          // Helper function to determine freelancer experience level based on profile data
+          function determineFreelancerLevel(freelancerData: any): 'entry' | 'intermediate' | 'expert' {
+            // Check if the freelancer has explicitly set their experience level
+            if (freelancerData.experienceLevel) {
+              return freelancerData.experienceLevel;
+            }
+            
+            // Otherwise, calculate based on years of experience or completed projects
+            const yearsOfExperience = freelancerData.yearsOfExperience || 0;
+            const completedProjects = freelancerData.completedProjects || 0;
+            const rating = freelancerData.rating || 0;
+            
+            // Simple algorithm to determine level
+            if (yearsOfExperience > 5 || completedProjects > 20 || rating > 4.5) {
+              return 'expert';
+            } else if (yearsOfExperience > 2 || completedProjects > 5 || rating > 4.0) {
+              return 'intermediate';
+            } else {
+              return 'entry';
+            }
+          }
+          
+          // Get the last document for pagination
+          const lastVisible = querySnapshot.docs.length > 0 ? querySnapshot.docs[querySnapshot.docs.length - 1] : null;
+          
+          // We need to make lastDoc serializable for Redux
+          // Instead of returning the DocumentSnapshot directly, store it in a cache and return a reference
+          // We'll use the document ID as a reference
+          const lastDocId = lastVisible ? lastVisible.id : null;
+          
+          // Store the actual DocumentSnapshot in a module-level cache
+          if (lastVisible) {
+            // Add to documentCache
+            documentCache.set(lastDocId, lastVisible);
+            
+            // Clean up the cache occasionally to prevent memory leaks
+            cleanupDocumentCache();
+          }
+          
+          return { 
+            data: { 
+              projects: projects,
+              // Return a serializable reference instead of the actual DocumentSnapshot
+              lastDoc: lastDocId
+            }
+          }
         } catch (error: any) {
           return { error: { status: 'CUSTOM_ERROR', error: error.message } }
         }
@@ -564,11 +759,7 @@ export const firebaseApi = createApi({
     }>({
       queryFn: async ({ clientId, status, limit: queryLimit = 50 }) => {
         try {
-          console.log("=== FIREBASE getProjectsByClient QUERY ===")
-          console.log("1. Input parameters:", { clientId, status, limit: queryLimit })
-          console.log("2. Client ID type:", typeof clientId)
-          console.log("3. Client ID length:", clientId?.length)
-          console.log("4. Client ID value:", `'${clientId}'`)
+          // Starting client projects query
           
           let q = query(
             collection(db, 'projects'),
@@ -583,13 +774,11 @@ export const firebaseApi = createApi({
               where('status', '==', status),
               limit(queryLimit)
             )
-            console.log("5. Added status filter:", status)
+            // Added status filter to query
           }
           
-          console.log("6. Executing Firestore query...")
+          // Execute Firestore query
           const querySnapshot = await getDocs(q)
-          console.log("7. Query snapshot size:", querySnapshot.size)
-          console.log("8. Query snapshot empty:", querySnapshot.empty)
           
           const projects = querySnapshot.docs.map((doc, index) => {
             const data = doc.data()
@@ -611,14 +800,31 @@ export const firebaseApi = createApi({
           
           // Sort by createdAt in memory (most recent first)
           projects.sort((a, b) => {
-            const aTime = a.createdAt?.seconds || 0
-            const bTime = b.createdAt?.seconds || 0
+            // Handle different timestamp formats safely
+            let aTime = 0;
+            let bTime = 0;
+            
+            if (a.createdAt) {
+              if (typeof a.createdAt === 'string') {
+                aTime = new Date(a.createdAt).getTime();
+              } else if (typeof a.createdAt === 'object' && a.createdAt !== null && 'seconds' in a.createdAt) {
+                // Firestore timestamp object
+                aTime = (a.createdAt as { seconds: number }).seconds * 1000;
+              }
+            }
+            
+            if (b.createdAt) {
+              if (typeof b.createdAt === 'string') {
+                bTime = new Date(b.createdAt).getTime();
+              } else if (typeof b.createdAt === 'object' && b.createdAt !== null && 'seconds' in b.createdAt) {
+                // Firestore timestamp object
+                bTime = (b.createdAt as { seconds: number }).seconds * 1000;
+              }
+            }
             return bTime - aTime
           })
           
-          console.log("10. Total projects found:", projects.length)
-          console.log("11. Returning projects to Redux")
-          console.log("========================================")
+          // Return projects to Redux
           return { data: projects }
         } catch (error: any) {
           console.error("=== FIREBASE QUERY ERROR ===")
@@ -635,16 +841,11 @@ export const firebaseApi = createApi({
     createProject: builder.mutation<Project, Omit<Project, 'projectId' | 'createdAt' | 'updatedAt' | 'publishedAt' | 'closedAt'>>({
       queryFn: async (projectData) => {
         try {
-          console.log('🚀 CreateProject - Original data:', projectData)
-          console.log('🚀 Timeline startDate type:', typeof projectData.timeline?.startDate, projectData.timeline?.startDate)
-          console.log('🚀 Timeline endDate type:', typeof projectData.timeline?.endDate, projectData.timeline?.endDate)
-          
           const docRef = doc(collection(db, 'projects'))
           const now = Timestamp.now()
           
           // Deserialize string dates to Timestamps for Firestore storage
           const deserializedProjectData = deserializeProjectForStorage(projectData)
-          console.log('🚀 After deserialization:', deserializedProjectData)
           
           const newProject = {
             ...deserializedProjectData,
@@ -659,8 +860,6 @@ export const firebaseApi = createApi({
           
           // Serialize the project before returning it to Redux
           const serializedProject = serializeProject(newProject)
-          console.log('🚀 After serialization:', serializedProject)
-          console.log('🚀 Timeline startDate after serialization:', typeof serializedProject.timeline?.startDate, serializedProject.timeline?.startDate)
           
           return { data: serializedProject }
         } catch (error: any) {
@@ -752,48 +951,235 @@ export const firebaseApi = createApi({
     }),
 
     // Proposal endpoints
+    getProposal: builder.query<Proposal, string>({
+      queryFn: async (proposalId) => {
+        try {
+          const docRef = doc(db, 'proposals', proposalId);
+          const docSnap = await getDoc(docRef);
+          
+          if (!docSnap.exists()) {
+            throw new Error('Proposal not found');
+          }
+          
+          const data = docSnap.data();
+          
+          // Serialize timestamps for Redux
+          const serializedData = {
+            ...data,
+            submittedAt: data.submittedAt ? data.submittedAt.toDate().toISOString() : null,
+            updatedAt: data.updatedAt ? data.updatedAt.toDate().toISOString() : null,
+            respondedAt: data.respondedAt ? data.respondedAt.toDate().toISOString() : null,
+            bid: data.bid ? {
+              ...data.bid,
+              deliveryDate: data.bid.deliveryDate ? data.bid.deliveryDate.toDate().toISOString() : null
+            } : null
+          };
+          
+          const proposal = {
+            proposalId: docSnap.id,
+            ...serializedData
+          } as Proposal;
+          
+          return { data: proposal };
+        } catch (error: any) {
+          return { error: { status: 'CUSTOM_ERROR', error: error.message } };
+        }
+      },
+      providesTags: (result, error, id) => [{ type: 'Proposal', id }],
+    }),
+
     getProposals: builder.query<Proposal[], { projectId?: string; freelancerId?: string }>({
       queryFn: async ({ projectId, freelancerId }) => {
+        console.log('API - getProposals called with:', { projectId, freelancerId });
+        
         try {
           let q = query(collection(db, 'proposals'), orderBy('createdAt', 'desc'))
           
           if (projectId) {
+            console.log('API - Filtering proposals by projectId:', projectId);
             q = query(q, where('projectId', '==', projectId))
           }
           
           if (freelancerId) {
+            console.log('API - Filtering proposals by freelancerId:', freelancerId);
             q = query(q, where('freelancerId', '==', freelancerId))
           }
           
+          console.log('API - Executing Firestore query for proposals');
           const querySnapshot = await getDocs(q)
+          console.log('API - Found proposal documents:', querySnapshot.size);
+          
           const proposals = querySnapshot.docs.map(doc => {
+            console.log('API - Processing proposal document:', doc.id);
             const data = doc.data()
-            return {
+            
+            // Serialize Firestore timestamps to ISO strings for Redux
+            const serializedData = {
+              ...data,
+              submittedAt: data.submittedAt ? data.submittedAt.toDate().toISOString() : null,
+              updatedAt: data.updatedAt ? data.updatedAt.toDate().toISOString() : null,
+              respondedAt: data.respondedAt ? data.respondedAt.toDate().toISOString() : null,
+              bid: data.bid ? {
+                ...data.bid,
+                deliveryDate: data.bid.deliveryDate ? data.bid.deliveryDate.toDate().toISOString() : null
+              } : null
+            };
+            
+            const processedProposal = {
               proposalId: doc.id,
-              ...data
-            } as Proposal
+              ...serializedData
+            } as Proposal;
+            
+            console.log('API - Processed proposal:', {
+              id: processedProposal.proposalId,
+              projectId: processedProposal.projectId,
+              freelancerId: processedProposal.freelancerId,
+              status: processedProposal.status
+            });
+            
+            return processedProposal;
           })
           
+          console.log('API - Returning proposals data, count:', proposals.length);
           return { data: proposals }
         } catch (error: any) {
+          console.error("Error fetching proposals:", error);
           return { error: { status: 'CUSTOM_ERROR', error: error.message } }
         }
       },
       providesTags: ['Proposal'],
     }),
 
-    createProposal: builder.mutation<Proposal, Omit<Proposal, 'id' | 'createdAt'>>({
+    createProposal: builder.mutation<Proposal, any>({
       queryFn: async (proposalData) => {
         try {
-          const newProposal = {
-            ...proposalData,
-            createdAt: new Date().toISOString(),
+          // Ensure required fields
+          if (!proposalData.projectId) {
+            throw new Error("Project ID is required")
+          }
+          if (!proposalData.freelancerId) {
+            throw new Error("Freelancer ID is required")
           }
           
-          const docRef = doc(collection(db, 'proposals'))
-          await setDoc(docRef, newProposal)
+          // Check if the freelancer has already submitted a proposal for this project
+          const existingProposalQuery = query(
+            collection(db, 'proposals'),
+            where('projectId', '==', proposalData.projectId),
+            where('freelancerId', '==', proposalData.freelancerId)
+          )
           
-          return { data: { id: docRef.id, ...newProposal } as Proposal }
+          const existingProposalSnapshot = await getDocs(existingProposalQuery)
+          
+          if (!existingProposalSnapshot.empty) {
+            throw new Error("You have already submitted a proposal for this project")
+          }
+          
+          // Convert JS Date objects to Firestore Timestamps with safer handling
+          let formattedProposalData = {
+            ...proposalData,
+            submittedAt: (() => {
+              if (proposalData.submittedAt instanceof Date) {
+                return Timestamp.fromDate(proposalData.submittedAt);
+              } else if (typeof proposalData.submittedAt === 'string') {
+                return Timestamp.fromDate(new Date(proposalData.submittedAt));
+              } else if (proposalData.submittedAt instanceof Timestamp) {
+                return proposalData.submittedAt;
+              } else {
+                return Timestamp.now();
+              }
+            })(),
+            updatedAt: (() => {
+              if (proposalData.updatedAt instanceof Date) {
+                return Timestamp.fromDate(proposalData.updatedAt);
+              } else if (typeof proposalData.updatedAt === 'string') {
+                return Timestamp.fromDate(new Date(proposalData.updatedAt));
+              } else if (proposalData.updatedAt instanceof Timestamp) {
+                return proposalData.updatedAt;
+              } else {
+                return Timestamp.now();
+              }
+            })(),
+            respondedAt: null, // Initialize as null until the client responds
+            bid: {
+              ...proposalData.bid,
+              deliveryDate: (() => {
+                if (proposalData.bid?.deliveryDate instanceof Date) {
+                  return Timestamp.fromDate(proposalData.bid.deliveryDate);
+                } else if (typeof proposalData.bid?.deliveryDate === 'string') {
+                  return Timestamp.fromDate(new Date(proposalData.bid.deliveryDate));
+                } else if (proposalData.bid?.deliveryDate instanceof Timestamp) {
+                  return proposalData.bid.deliveryDate;
+                } else {
+                  return Timestamp.fromDate(new Date(Date.now() + (30 * 24 * 60 * 60 * 1000))); // Default to 30 days from now
+                }
+              })()
+            }
+          }
+          
+          // Create a new proposal document
+          const proposalRef = doc(collection(db, 'proposals'))
+          const proposalId = proposalRef.id
+          
+          // Add the proposalId to the data
+          formattedProposalData.proposalId = proposalId
+          
+          // Save the proposal
+          await setDoc(proposalRef, formattedProposalData)
+          
+          // Update the project's proposal count
+          const projectRef = doc(db, 'projects', proposalData.projectId)
+          await updateDoc(projectRef, {
+            proposalCount: (await getDoc(projectRef)).data()?.proposalCount + 1 || 1
+          })
+          
+          // Create a notification for the project owner
+          try {
+            const projectSnapshot = await getDoc(projectRef)
+            const projectData = projectSnapshot.data()
+            
+            if (projectData && projectData.clientId) {
+              const notificationRef = doc(collection(db, 'notifications'))
+              await setDoc(notificationRef, {
+                notificationId: notificationRef.id,
+                userId: projectData.clientId,
+                type: 'proposal_received',
+                title: 'New Proposal Received',
+                message: `${proposalData.freelancerInfo.name} submitted a proposal for your project "${projectData.title}"`,
+                data: {
+                  projectId: proposalData.projectId,
+                  proposalId: proposalId
+                },
+                isRead: false,
+                isPush: true,
+                isEmail: true,
+                createdAt: Timestamp.now(),
+                readAt: null
+              })
+            }
+          } catch (notificationError) {
+            // Don't fail the proposal submission if notification creation fails
+            console.error('Failed to create notification:', notificationError)
+          }
+          
+          // Return serialized proposal data for Redux with safer handling
+          const serializedProposal = {
+            ...formattedProposalData,
+            submittedAt: formattedProposalData.submittedAt?.toDate ? 
+              formattedProposalData.submittedAt.toDate().toISOString() : 
+              formattedProposalData.submittedAt ? new Date(formattedProposalData.submittedAt).toISOString() : null,
+            updatedAt: formattedProposalData.updatedAt?.toDate ? 
+              formattedProposalData.updatedAt.toDate().toISOString() : 
+              formattedProposalData.updatedAt ? new Date(formattedProposalData.updatedAt).toISOString() : null,
+            respondedAt: null,
+            bid: {
+              ...formattedProposalData.bid,
+              deliveryDate: formattedProposalData.bid?.deliveryDate?.toDate ? 
+                formattedProposalData.bid.deliveryDate.toDate().toISOString() : 
+                formattedProposalData.bid?.deliveryDate ? new Date(formattedProposalData.bid.deliveryDate).toISOString() : null
+            }
+          }
+          
+          return { data: serializedProposal as Proposal }
         } catch (error: any) {
           return { error: { status: 'CUSTOM_ERROR', error: error.message } }
         }
@@ -801,25 +1187,75 @@ export const firebaseApi = createApi({
       invalidatesTags: ['Proposal', 'Project'],
     }),
 
-    updateProposal: builder.mutation<Proposal, { id: string; updateData: Partial<Proposal> }>({
-      queryFn: async ({ id, updateData }) => {
+    updateProposal: builder.mutation<Proposal, { id: string; proposal: any }>({
+      queryFn: async ({ id, proposal }) => {
         try {
-          const proposalRef = doc(db, 'proposals', id)
-          await updateDoc(proposalRef, updateData)
+          const proposalRef = doc(db, 'proposals', id);
           
-          const updatedDoc = await getDoc(proposalRef)
-          const docData = updatedDoc.data()
-          const proposal = {
+          // Convert dates back to Firestore Timestamps
+          const formattedProposalData = {
+            ...proposal,
+            // Safely handle submittedAt date
+            submittedAt: (() => {
+              if (proposal.submittedAt instanceof Date) {
+                return Timestamp.fromDate(proposal.submittedAt);
+              } else if (typeof proposal.submittedAt === 'string') {
+                return Timestamp.fromDate(new Date(proposal.submittedAt));
+              } else if (proposal.submittedAt instanceof Timestamp) {
+                return proposal.submittedAt;
+              } else {
+                return Timestamp.fromDate(new Date());
+              }
+            })(),
+            updatedAt: Timestamp.fromDate(new Date()),
+            bid: {
+              ...proposal.bid,
+              // Safely handle deliveryDate
+              deliveryDate: (() => {
+                if (proposal.bid?.deliveryDate instanceof Date) {
+                  return Timestamp.fromDate(proposal.bid.deliveryDate);
+                } else if (typeof proposal.bid?.deliveryDate === 'string') {
+                  return Timestamp.fromDate(new Date(proposal.bid.deliveryDate));
+                } else if (proposal.bid?.deliveryDate instanceof Timestamp) {
+                  return proposal.bid.deliveryDate;
+                } else {
+                  return Timestamp.fromDate(new Date(Date.now() + (30 * 24 * 60 * 60 * 1000))); // Default to 30 days from now
+                }
+              })()
+            }
+          };
+          
+          // Update the document
+          await setDoc(proposalRef, formattedProposalData);
+          
+          // Fetch the updated document
+          const updatedDoc = await getDoc(proposalRef);
+          if (!updatedDoc.exists()) {
+            throw new Error('Proposal not found after update');
+          }
+          
+          const docData = updatedDoc.data();
+          
+          // Serialize the data for Redux
+          const serializedProposal = {
             proposalId: updatedDoc.id,
-            ...docData
-          } as Proposal
+            ...docData,
+            submittedAt: docData.submittedAt.toDate().toISOString(),
+            updatedAt: docData.updatedAt.toDate().toISOString(),
+            respondedAt: docData.respondedAt ? docData.respondedAt.toDate().toISOString() : null,
+            bid: {
+              ...docData.bid,
+              deliveryDate: docData.bid.deliveryDate.toDate().toISOString()
+            }
+          };
           
-          return { data: proposal }
+          return { data: serializedProposal as Proposal };
         } catch (error: any) {
-          return { error: { status: 'CUSTOM_ERROR', error: error.message } }
+          console.error('Error updating proposal:', error);
+          return { error: { status: 'CUSTOM_ERROR', error: error.message } };
         }
       },
-      invalidatesTags: ['Proposal'],
+      invalidatesTags: ['Proposal', 'Project'],
     }),
 
     // Progressive Signup endpoints
@@ -1180,9 +1616,23 @@ export const firebaseApi = createApi({
             throw new Error('User not found')
           }
           
-          return { data: { data: serializeUser({ userId, ...updatedUser.data() }), message: 'Specialties updated successfully' } }
+          const userData = serializeUser({ userId, ...updatedUser.data() });
+          
+          // Return in the format RTK Query expects
+          return { 
+            data: {
+              success: true,
+              data: userData,
+              message: 'Specialties updated successfully' 
+            }
+          }
         } catch (error: any) {
-          return { error: { status: 'CUSTOM_ERROR', error: error.message } }
+          return { 
+            error: { 
+              status: 'CUSTOM_ERROR', 
+              data: error.message 
+            }
+          }
         }
       },
       invalidatesTags: ['User'],
@@ -1480,6 +1930,7 @@ export const {
   useGetProjectsByClientQuery,
   useCreateProjectMutation,
   useUpdateProjectMutation,
+  useGetProposalQuery,
   useGetProposalsQuery,
   useCreateProposalMutation,
   useUpdateProposalMutation,
