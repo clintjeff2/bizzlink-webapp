@@ -90,9 +90,28 @@ const UnauthenticatedNav = () => {
   )
 }
 
-// Navigation for users in onboarding process
+// Helper function for safely getting user initials
+const getUserInitials = (user: any) => {
+  const first = user?.firstname?.charAt(0) || '';
+  const last = user?.lastname?.charAt(0) || '';
+  return first + last || 'U';
+};
+
 const OnboardingNav = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
   const pathname = usePathname()
+  const [isLoading, setIsLoading] = useState(false)
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+  
+  // Handle setup button click with loading indicator
+  const handleSetupClick = (e: React.MouseEvent) => {
+    e.preventDefault() // Prevent immediate navigation
+    setIsLoading(true)
+    
+    // Keep dropdown open to show the loading indicator
+    setTimeout(() => {
+      window.location.href = '/freelancer/onboarding/specialty'
+    }, 800) // Show loading state for 800ms before navigating
+  }
   
   return (
     <nav className="sticky top-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg border-b border-gray-200 dark:border-gray-700">
@@ -127,29 +146,29 @@ const OnboardingNav = ({ user, onLogout }: { user: any, onLogout: () => void }) 
             </div>
           </div>
           <div className="flex items-center space-x-4">
-            <DropdownMenu>
+            <DropdownMenu open={isLoading ? true : undefined} onOpenChange={setDropdownOpen}>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="flex items-center space-x-2">
-                  {user.photoURL ? (
+                  {user?.photoURL ? (
                     <Image
                       src={user.photoURL}
-                      alt={user.displayName}
+                      alt={user?.displayName || 'User'}
                       width={32}
                       height={32}
                       className="w-8 h-8 rounded-full object-cover"
                     />
                   ) : (
                     <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-green-500 flex items-center justify-center text-white font-semibold text-sm">
-                      {user.firstName.charAt(0)}{user.lastName.charAt(0)}
+                      {getUserInitials(user)}
                     </div>
                   )}
-                  <span className="hidden md:block">{user.firstName}</span>
+                  <span className="hidden md:block">{user?.firstName || 'User'}</span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 <div className="px-2 py-1.5">
-                  <p className="text-sm font-medium">{user.displayName}</p>
-                  <p className="text-xs text-gray-500">{user.email}</p>
+                  <p className="text-sm font-medium">{user?.displayName || user?.email || 'User'}</p>
+                  <p className="text-xs text-gray-500">{user?.email || ''}</p>
                   <div className="flex items-center space-x-2 mt-1">
                     <Badge variant="outline" className="text-xs capitalize">
                       {user.role}
@@ -167,17 +186,46 @@ const OnboardingNav = ({ user, onLogout }: { user: any, onLogout: () => void }) 
                   </Link>
                 </DropdownMenuItem>
                 {user.role === 'freelancer' && (
-                  <DropdownMenuItem asChild>
-                    <Link href="/freelancer/onboarding/specialty" className="flex items-center">
-                      <Settings className="w-4 h-4 mr-2" />
-                      Continue Setup
+                  <DropdownMenuItem disabled={isLoading}>
+                    <Link 
+                      href="/freelancer/onboarding/specialty" 
+                      className="flex items-center w-full" 
+                      onClick={handleSetupClick}
+                    >
+                      {isLoading ? (
+                        <>
+                          <div className="w-4 h-4 mr-2 border-2 border-t-blue-500 border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin"></div>
+                          Loading...
+                        </>
+                      ) : (
+                        <>
+                          <Settings className="w-4 h-4 mr-2" />
+                          Continue Setup
+                        </>
+                      )}
                     </Link>
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={onLogout} className="text-red-600">
-                  <LogOut className="w-4 h-4 mr-2" />
-                  Sign Out
+                <DropdownMenuItem 
+                  onClick={() => {
+                    setIsLoading(true);
+                    onLogout();
+                  }} 
+                  disabled={isLoading}
+                  className="text-red-600"
+                >
+                  {isLoading ? (
+                    <>
+                      <div className="w-4 h-4 mr-2 border-2 border-t-red-500 border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin"></div>
+                      Signing Out...
+                    </>
+                  ) : (
+                    <>
+                      <LogOut className="w-4 h-4 mr-2" />
+                      Sign Out
+                    </>
+                  )}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -308,26 +356,26 @@ const AuthenticatedNav = ({ user, logout }: { user: any, logout: () => void }) =
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="flex items-center space-x-2">
-                  {user.photoURL ? (
+                  {user?.photoURL ? (
                     <Image
                       src={user.photoURL}
-                      alt={user.displayName}
+                      alt={user?.displayName || 'User'}
                       width={32}
                       height={32}
                       className="w-8 h-8 rounded-full object-cover"
                     />
                   ) : (
                     <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-green-500 flex items-center justify-center text-white font-semibold text-sm">
-                      {user.firstName.charAt(0)}{user.lastName.charAt(0)}
+                      {getUserInitials(user)}
                     </div>
                   )}
-                  <span className="hidden md:block">{user.firstName}</span>
+                  <span className="hidden md:block">{user?.firstname || 'User'}</span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 <div className="px-2 py-1.5">
-                  <p className="text-sm font-medium">{user.displayName}</p>
-                  <p className="text-xs text-gray-500">{user.email}</p>
+                  <p className="text-sm font-medium">{user?.displayName || user?.email || 'User'}</p>
+                  <p className="text-xs text-gray-500">{user?.email || ''}</p>
                   <Badge variant="outline" className="mt-1 text-xs capitalize">
                     {user.role}
                   </Badge>
@@ -464,11 +512,11 @@ export function Navigation() {
   // Debug logging to help troubleshoot navigation state
   if (process.env.NODE_ENV === 'development') {
     console.log('Navigation state:', {
-      user: user ? { email: user.email, role: user.role } : null,
-      onboardingUser: onboardingUser ? { email: onboardingUser.email, role: onboardingUser.role, isOnboarding: onboardingUser.isOnboarding } : null,
+      user: user ? { email: user?.email, role: user?.role } : null,
+      onboardingUser: onboardingUser ? { email: onboardingUser?.email, role: onboardingUser?.role, isOnboarding: onboardingUser?.isOnboarding } : null,
       localStorage_onboarding: typeof window !== 'undefined' ? (localStorage.getItem('bizzlink_user_onboarding') ? 'exists' : 'null') : 'server',
       localStorage_signup: typeof window !== 'undefined' ? (localStorage.getItem('bizzlink_signup_progress') ? 'exists' : 'null') : 'server',
-      mounted
+      isMounted: mounted
     })
   }
 
@@ -490,6 +538,7 @@ export function Navigation() {
   }
 
   if (user) {
+    console.log(user, "User Data")
     // User is fully authenticated
     return <AuthenticatedNav user={user} logout={logout} />
   } else if (onboardingUser) {
