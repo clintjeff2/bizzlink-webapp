@@ -173,15 +173,68 @@ export default function PostProjectPage() {
       
       // Set uploaded files from existing attachments
       if (existingProject.requirements?.attachments) {
-        const fileResults: FileUploadResult[] = existingProject.requirements.attachments.map(a => ({
-          fileName: a.fileName,
-          fileUrl: a.fileUrl,
-          fileType: a.fileType || "application/octet-stream",
-          uploadedAt: a.uploadedAt || new Date().toISOString(),
-          path: a.fileUrl, // Use fileUrl as path
-          size: 0 // We don't have size info from DB
-        }))
+        // First, extract file sizes from the attachments or estimate based on file type
+        const estimateFileSize = (fileName: string, fileType: string, providedSize: number | undefined) => {
+          // If size is provided and valid, use it
+          if (providedSize && providedSize > 0) {
+            return providedSize;
+          }
+          
+          // Otherwise estimate based on file type
+          const fileExt = fileName.split('.').pop()?.toLowerCase();
+          if (fileType.includes('image')) {
+            return 500 * 1024; // ~500KB for images
+          } else if (fileExt === 'pdf') {
+            return 2 * 1024 * 1024; // ~2MB for PDFs
+          } else if (['doc', 'docx'].includes(fileExt || '')) {
+            return 1.5 * 1024 * 1024; // ~1.5MB for Word docs
+          } else if (['zip'].includes(fileExt || '')) {
+            return 3 * 1024 * 1024; // ~3MB for archives
+          } else {
+            return 1 * 1024 * 1024; // ~1MB default
+          }
+        };
+      
+        const fileResults: FileUploadResult[] = existingProject.requirements.attachments.map(a => {
+          const estimatedSize = estimateFileSize(a.fileName, a.fileType || '', a.fileSize);
+          return {
+            fileName: a.fileName,
+            fileUrl: a.fileUrl,
+            fileType: a.fileType || "application/octet-stream",
+            uploadedAt: a.uploadedAt || new Date().toISOString(),
+            path: a.storageRef || a.fileUrl, // Use storageRef if available, fallback to fileUrl
+            size: estimatedSize // Use estimated size if fileSize is not available
+          };
+        })
         setUploadedFiles(fileResults)
+        
+        // Create File objects for the UI to display with reasonable size estimates
+        const filePlaceholders = existingProject.requirements.attachments.map(a => {
+          // Create a File-like object for UI display with the same size as in fileResults
+          const correspondingFileResult = fileResults.find(f => f.fileName === a.fileName);
+          const size = correspondingFileResult?.size || 0;
+          
+          // Create blob with dummy content proportional to the estimated size
+          // This is just to make the File object report a realistic size
+          const dummyContent = new ArrayBuffer(Math.min(size, 1024)); // Limit actual memory usage
+          const fileBlob = new Blob([dummyContent], { type: a.fileType || 'application/octet-stream' });
+          
+          const file = new File([fileBlob], a.fileName, { 
+            type: a.fileType || 'application/octet-stream',
+            lastModified: new Date(a.uploadedAt || Date.now()).getTime()
+          });
+          
+          // Use Object.defineProperty to override the size property
+          Object.defineProperty(file, 'size', {
+            value: size,
+            writable: false
+          });
+          
+          return file;
+        });
+        
+        // Update the form data with these placeholder files for UI display
+        handleInputChange("attachments", filePlaceholders);
       }
       
       toast({
@@ -402,13 +455,25 @@ export default function PostProjectPage() {
       const uploadedFile = uploadedFiles[index]
       
       if (uploadedFile && uploadedFile.path) {
-        // Delete from Firebase Storage first
-        await deleteProjectRequirementFiles([uploadedFile.path])
+        // For existing files in edit mode, we don't want to delete from storage yet
+        // We'll track removals and only delete on form submission
+        const isExistingFile = isEditMode && !projectData.attachments[index]?.size && uploadedFile
         
-        toast({
-          title: "File Removed",
-          description: `${uploadedFile.fileName} has been deleted from storage`,
-        })
+        if (!isExistingFile) {
+          // Delete from Firebase Storage first (only for newly uploaded files)
+          await deleteProjectRequirementFiles([uploadedFile.path])
+          
+          toast({
+            title: "File Removed",
+            description: `${uploadedFile.fileName} has been deleted from storage`,
+          })
+        } else {
+          // Just mark for removal without immediate deletion for existing files
+          toast({
+            title: "File Marked for Removal",
+            description: `${uploadedFile.fileName} will be removed when you save changes`,
+          })
+        }
       }
       
       // Remove from local state
@@ -521,23 +586,35 @@ export default function PostProjectPage() {
       const attachmentData = uploadedFiles.map(file => ({
         fileName: file.fileName,
         fileUrl: file.fileUrl,
-        fileType: file.fileName.split('.').pop() || '',
-        uploadedAt: new Date().toISOString()
+        fileType: file.fileType || file.fileName.split('.').pop() || '',
+        uploadedAt: new Date().toISOString(),
+        storageRef: file.path, // Store the storage reference for later deletion
+        fileSize: file.size || 0 // Store file size for reference
       }))
       
-      if (isEditMode && editProjectId) {
+      if (isEditMode && editProjectId && existingProject) {
         // Update existing project - ensure isDraft is false for publishing
         const finalProjectData = {
           ...projectData,
           isDraft: false // Explicitly set to false when posting project
         }
         
-        const projectToUpdate = convertFormDataToProject(
+        const baseProjectData = convertFormDataToProject(
           finalProjectData, 
           user.userId, 
           clientInfo,
-          attachmentData
+          attachmentData,
+          existingProject // Pass existing project to preserve important fields
         )
+        
+        // Create an update object that preserves important existing data
+        const projectToUpdate = {
+          ...baseProjectData,
+          // Preserve existing proposal count
+          proposalCount: existingProject.proposalCount,
+          // Preserve hired freelancer ID if exists
+          hiredFreelancerId: existingProject.hiredFreelancerId || '',
+        }
         
         await updateProject({
           projectId: editProjectId,
@@ -643,14 +720,30 @@ export default function PostProjectPage() {
             <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 via-blue-800 to-purple-800 bg-clip-text text-transparent mb-3">
               {isEditMode ? "Edit Your Project" : "Post Your Dream Project"}
             </h1>
-            <p className="text-gray-600 text-lg max-w-2xl mx-auto">
+              <p className="text-gray-600 text-lg max-w-2xl mx-auto">
               {isEditMode 
                 ? "Update your project details and requirements" 
                 : "Connect with world-class freelancers and bring your vision to life"
               }
             </p>
             
-            {/* Auto-save indicator */}
+            {/* Back to Projects Button (Only visible in edit mode) */}
+            {isEditMode && (
+              <div className="mt-4">
+                <Button
+                  type="button"
+                  onClick={() => {
+                    // Clear form data and navigate back to projects
+                    ProjectFormPersistence.clear();
+                    router.push('/client/projects');
+                  }}
+                  className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Back to Projects
+                </Button>
+              </div>
+            )}            {/* Auto-save indicator */}
             <div className="flex items-center justify-center mt-4 space-x-2">
               {isSaving ? (
                 <>
@@ -1146,22 +1239,48 @@ export default function PostProjectPage() {
                             </h5>
                             {projectData.attachments.map((file, index) => {
                               const uploadedFile = uploadedFiles[index]
+                              // Make sure we get the correct file size, prioritizing the file object's size property
+                              // which we've correctly set in our modified code above
+                              const fileSize = file.size || uploadedFile?.size || 0
+                              const isExistingFile = isEditMode && uploadedFile
+                              
+                              // Format the file size appropriately
+                              const formatFileSize = (bytes: number): string => {
+                                if (bytes === 0) return "0 Bytes";
+                                const k = 1024;
+                                const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+                              };
+                              
                               return (
-                                <div key={index} className="flex items-center justify-between bg-white rounded-lg p-3 border border-green-200">
+                                <div key={index} className={`flex items-center justify-between bg-white rounded-lg p-3 border ${isExistingFile ? 'border-blue-200' : 'border-green-200'}`}>
                                   <div className="flex items-center space-x-3">
-                                    <FileText className="w-5 h-5 text-green-600" />
+                                    <FileText className={`w-5 h-5 ${isExistingFile ? 'text-blue-600' : 'text-green-600'}`} />
                                     <div className="flex flex-col">
-                                      <span className="text-sm font-medium text-gray-900">{file.name}</span>
+                                      <span className="text-sm font-medium text-gray-900">{file.name || uploadedFile?.fileName}</span>
                                       <div className="flex items-center space-x-2 text-xs text-gray-500">
-                                        <span>{(file.size / 1024 / 1024).toFixed(2)} MB</span>
+                                        <span>{formatFileSize(fileSize)}</span>
                                         {uploadedFile && (
                                           <>
                                             <span>•</span>
-                                            <CheckCircle className="w-3 h-3 text-green-500" />
-                                            <span className="text-green-600">Uploaded to Firebase</span>
+                                            <CheckCircle className={`w-3 h-3 ${isExistingFile ? 'text-blue-500' : 'text-green-500'}`} />
+                                            <span className={`${isExistingFile ? 'text-blue-600' : 'text-green-600'}`}>
+                                              {isExistingFile ? 'Existing File' : 'Uploaded to Firebase'}
+                                            </span>
                                           </>
                                         )}
                                       </div>
+                                      {uploadedFile && (
+                                        <a 
+                                          href={uploadedFile.fileUrl} 
+                                          target="_blank" 
+                                          rel="noopener noreferrer" 
+                                          className="text-xs text-blue-600 hover:text-blue-800 hover:underline mt-1"
+                                        >
+                                          Preview file
+                                        </a>
+                                      )}
                                     </div>
                                   </div>
                                   <Button
@@ -1569,12 +1688,26 @@ export default function PostProjectPage() {
                         <div className="bg-white rounded-lg p-4">
                           <h4 className="font-semibold text-gray-900 mb-2">Attachments</h4>
                           <div className="space-y-2">
-                            {projectData.attachments.map((file, index) => (
-                              <div key={index} className="flex items-center space-x-2 text-sm text-gray-700">
-                                <FileText className="w-4 h-4" />
-                                <span>{file.name}</span>
-                              </div>
-                            ))}
+                            {projectData.attachments.map((file, index) => {
+                              const uploadedFile = uploadedFiles[index];
+                              const fileSize = file.size || uploadedFile?.size || 0;
+                              
+                              // Format the file size appropriately
+                              const formatFileSize = (bytes: number): string => {
+                                if (bytes === 0) return "";
+                                const k = 1024;
+                                const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                                return ` (${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]})`;
+                              };
+                              
+                              return (
+                                <div key={index} className="flex items-center space-x-2 text-sm text-gray-700">
+                                  <FileText className="w-4 h-4 text-blue-600" />
+                                  <span>{file.name}{formatFileSize(fileSize)}</span>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       )}
