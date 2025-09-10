@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Navigation } from "@/components/navigation"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { ConfirmModal } from "@/components/modals/confirm-modal"
 import {
   ArrowLeft,
   Calendar,
@@ -64,6 +65,7 @@ export default function ProposalDetailPage({ params }: { params: { id: string } 
   const [activeTab, setActiveTab] = useState("proposal")
   const [selectedFile, setSelectedFile] = useState<{ url: string; name: string; type: string } | null>(null)
   const [isPreviewOpen, setIsPreviewOpen] = useState(false)
+  const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false)
   const [proposal, setProposal] = useState<Proposal | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -134,21 +136,36 @@ export default function ProposalDetailPage({ params }: { params: { id: string } 
   }, [currentProposal, reduxError, user])
 
   // Handle proposal withdrawal
+  const openWithdrawModal = () => {
+    setIsWithdrawModalOpen(true)
+  }
+  
   const handleWithdrawProposal = async () => {
     if (!proposal) return
     
-    if (!confirm("Are you sure you want to withdraw this proposal? This action cannot be undone.")) {
-      return
-    }
-    
     try {
+      // Optimistically update the UI first
+      setProposal(prevProposal => {
+        if (!prevProposal) return null;
+        return { ...prevProposal, status: 'withdrawn' };
+      });
+      
+      // Dispatch the action to update in Firebase
       await dispatch(withdrawProposal(proposal.proposalId))
+      
       toast({
         title: "Proposal withdrawn",
         description: "Your proposal has been successfully withdrawn.",
       })
+      
+      // Navigate back to proposals list
+      router.push("/freelancer/proposals")
     } catch (err) {
       console.error('Error withdrawing proposal:', err)
+      
+      // Revert to original proposal data on error
+      setProposal(currentProposal)
+      
       toast({
         title: "Error",
         description: "Failed to withdraw proposal. Please try again.",
@@ -272,6 +289,18 @@ export default function ProposalDetailPage({ params }: { params: { id: string } 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <Navigation />
+      
+      {/* Withdraw Confirmation Modal */}
+      <ConfirmModal
+        isOpen={isWithdrawModalOpen}
+        onClose={() => setIsWithdrawModalOpen(false)}
+        onConfirm={handleWithdrawProposal}
+        title="Withdraw Proposal"
+        description="Are you sure you want to withdraw this proposal? This action cannot be undone."
+        confirmText="Yes, withdraw"
+        cancelText="Cancel"
+        variant="destructive"
+      />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
@@ -335,7 +364,7 @@ export default function ProposalDetailPage({ params }: { params: { id: string } 
                   variant="outline" 
                   size="sm"
                   className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700"
-                  onClick={handleWithdrawProposal}>
+                  onClick={openWithdrawModal}>
                   Withdraw Proposal
                 </Button>
               )}
