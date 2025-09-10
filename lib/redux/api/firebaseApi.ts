@@ -875,16 +875,39 @@ export const firebaseApi = createApi({
         try {
           const projectRef = doc(db, 'projects', projectId)
           
-          // Deserialize string dates to Timestamps for Firestore storage
-          const deserializedUpdateData = deserializeProjectForStorage(updateData)
+          // First get the current document to preserve important fields
+          const currentDoc = await getDoc(projectRef)
+          const currentData = currentDoc.data() || {}
           
+          // Filter out null values and undefined values from updateData
+          // These indicate fields that should be preserved, not overwritten
+          const filteredUpdateData = { ...updateData }
+          Object.keys(filteredUpdateData).forEach(key => {
+            if (filteredUpdateData[key as keyof typeof filteredUpdateData] === null || 
+                filteredUpdateData[key as keyof typeof filteredUpdateData] === undefined) {
+              delete filteredUpdateData[key as keyof typeof filteredUpdateData]
+            }
+          })
+          
+          // Deserialize string dates to Timestamps for Firestore storage
+          const deserializedUpdateData = deserializeProjectForStorage(filteredUpdateData)
+          
+          // Carefully merge the update data
           const updateDataWithTimestamp = {
             ...deserializedUpdateData,
             updatedAt: Timestamp.now(),
             // Set publishedAt if status is being changed to active
-            ...(updateData.status === 'active' && !updateData.publishedAt && { publishedAt: Timestamp.now() }),
+            ...(filteredUpdateData.status === 'active' && !currentData.publishedAt && { publishedAt: Timestamp.now() }),
             // Set closedAt if status is being changed to completed or cancelled
-            ...((['completed', 'cancelled'].includes(updateData.status as string)) && { closedAt: Timestamp.now() })
+            ...((['completed', 'cancelled'].includes(filteredUpdateData.status as string)) && { closedAt: Timestamp.now() }),
+            // Only update proposalCount if it's explicitly provided and valid
+            ...(filteredUpdateData.proposalCount !== undefined ? 
+              { proposalCount: filteredUpdateData.proposalCount } : 
+              { proposalCount: currentData.proposalCount || 0 }),
+            // Only update hiredFreelancerId if it's explicitly provided and valid
+            ...(filteredUpdateData.hiredFreelancerId ? 
+              { hiredFreelancerId: filteredUpdateData.hiredFreelancerId } : 
+              { hiredFreelancerId: currentData.hiredFreelancerId || '' })
           }
           
           await updateDoc(projectRef, updateDataWithTimestamp)
@@ -993,11 +1016,19 @@ export const firebaseApi = createApi({
         console.log('API - getProposals called with:', { projectId, freelancerId });
         
         try {
-          let q = query(collection(db, 'proposals'), orderBy('createdAt', 'desc'))
+          // Start with a basic query
+          let q = query(collection(db, 'proposals'))
           
           if (projectId) {
             console.log('API - Filtering proposals by projectId:', projectId);
-            q = query(q, where('projectId', '==', projectId))
+            // Use the index that includes projectId and submittedAt
+            q = query(q, 
+              where('projectId', '==', projectId),
+              orderBy('submittedAt', 'desc')
+            )
+          } else {
+            // If no projectId, just order by submittedAt
+            q = query(q, orderBy('submittedAt', 'desc'))
           }
           
           if (freelancerId) {
@@ -1829,6 +1860,7 @@ export const firebaseApi = createApi({
           }
           if (locationData.profileImageUrl) {
             updateData.photoURL = locationData.profileImageUrl
+            updateData['about.profileUrl'] = locationData.profileImageUrl // Keep both in sync
           }
 
           await updateDoc(userRef, updateData)
@@ -1858,6 +1890,156 @@ export const firebaseApi = createApi({
           return { data: serializeUser({ userId, ...userDoc.data() }) }
         } catch (error: any) {
           return { error: { status: 'CUSTOM_ERROR', error: error.message } }
+        }
+      },
+      providesTags: ['User'],
+    }),
+    
+    // Get all freelancers with pagination and filters
+    getFreelancers: builder.query<PaginatedResponse<User>, {
+      page?: number;
+      pageSize?: number;
+      lastVisible?: any;
+      filters?: {
+        searchQuery?: string;
+        category?: string;
+        location?: string;
+        experienceLevel?: string;
+        minRate?: number;
+        maxRate?: number;
+        skills?: string[];
+      };
+      sortBy?: 'rating' | 'completedJobs' | 'hourRate' | 'hourRateDesc' | 'reviewCount' | 'bestMatch';
+    }>({
+      queryFn: async ({ page = 1, pageSize = 10, lastVisible = null, filters = {}, sortBy = 'bestMatch' }) => {
+        try {
+          // Start with basic query of all freelancers - simplify the query to avoid errors
+          let userQuery = query(
+            collection(db, 'users')
+          );
+          
+          // We'll apply filtering in memory to avoid Firestore limitations
+          const querySnapshot = await getDocs(userQuery);
+          let freelancers: User[] = [];
+          
+          // Transform documents into User objects
+          querySnapshot.forEach(doc => {
+            const userData = doc.data();
+            // Only include users with 'freelancer' role
+            if (userData.role === 'freelancer') {
+              freelancers.push(serializeUser({ userId: doc.id, ...userData }));
+            }
+          });
+          
+          // Client-side filtering for all filters
+          // Filter by search query (check name, title, skills, etc.)
+          if (filters.searchQuery) {
+            const search = filters.searchQuery.toLowerCase();
+            freelancers = freelancers.filter(freelancer => 
+              (freelancer.displayName || '').toLowerCase().includes(search) ||
+              (freelancer.title || '').toLowerCase().includes(search) ||
+              (freelancer.overview || '').toLowerCase().includes(search) ||
+              freelancer.skills?.some(skill => (skill.text || '').toLowerCase().includes(search))
+            );
+          }
+          
+          // Filter by location
+          if (filters.location && filters.location !== 'All Locations') {
+            freelancers = freelancers.filter(freelancer => {
+              if (filters.location === 'Remote Only') {
+                return freelancer.about?.country === 'Remote';
+              } else {
+                return freelancer.about?.country === filters.location;
+              }
+            });
+          }
+          
+          // Filter by experience level
+          if (filters.experienceLevel && filters.experienceLevel !== 'All Levels') {
+            freelancers = freelancers.filter(freelancer => 
+              freelancer.skills?.some(skill => 
+                skill.level?.toLowerCase() === filters.experienceLevel?.toLowerCase()
+              )
+            );
+          }
+          
+          // Filter by category/specialty
+          if (filters.category && filters.category !== 'All Categories') {
+            freelancers = freelancers.filter(freelancer =>
+              freelancer.specialties?.some(specialty => 
+                specialty.includes(filters.category || '')
+              ) ||
+              freelancer.skills?.some(skill => 
+                (skill.text || '').toLowerCase().includes((filters.category || '').toLowerCase())
+              )
+            );
+          }
+          
+          // Filter by hourly rate range
+          if (typeof filters.minRate === 'number') {
+            freelancers = freelancers.filter(freelancer => {
+              // Extract numeric value from hourRate string (e.g., "$ 20" -> 20)
+              const rate = freelancer.hourRate ? parseFloat(freelancer.hourRate.replace(/[^0-9.]/g, '')) : 0;
+              return rate >= filters.minRate!;
+            });
+          }
+          
+          if (typeof filters.maxRate === 'number') {
+            freelancers = freelancers.filter(freelancer => {
+              const rate = freelancer.hourRate ? parseFloat(freelancer.hourRate.replace(/[^0-9.]/g, '')) : 0;
+              return rate <= filters.maxRate!;
+            });
+          }
+          
+          // Apply sorting
+          if (sortBy === 'rating') {
+            freelancers.sort((a, b) => (b.stats?.averageRating || 0) - (a.stats?.averageRating || 0));
+          } else if (sortBy === 'completedJobs') {
+            freelancers.sort((a, b) => (b.stats?.completedJobs || 0) - (a.stats?.completedJobs || 0));
+          } else if (sortBy === 'hourRate') {
+            freelancers.sort((a, b) => {
+              const rateA = a.hourRate ? parseFloat(a.hourRate.replace(/[^0-9.]/g, '')) : 0;
+              const rateB = b.hourRate ? parseFloat(b.hourRate.replace(/[^0-9.]/g, '')) : 0;
+              return rateA - rateB;
+            });
+          } else if (sortBy === 'hourRateDesc') {
+            freelancers.sort((a, b) => {
+              const rateA = a.hourRate ? parseFloat(a.hourRate.replace(/[^0-9.]/g, '')) : 0;
+              const rateB = b.hourRate ? parseFloat(b.hourRate.replace(/[^0-9.]/g, '')) : 0;
+              return rateB - rateA;
+            });
+          } else if (sortBy === 'reviewCount') {
+            freelancers.sort((a, b) => (b.stats?.totalReviews || 0) - (a.stats?.totalReviews || 0));
+          } else {
+            // bestMatch - sort by a combination of rating and jobs completed
+            freelancers.sort((a, b) => {
+              const scoreA = (a.stats?.averageRating || 0) * 0.6 + (a.stats?.completedJobs || 0) * 0.4 / 100;
+              const scoreB = (b.stats?.averageRating || 0) * 0.6 + (b.stats?.completedJobs || 0) * 0.4 / 100;
+              return scoreB - scoreA;
+            });
+          }
+          
+          // Apply pagination
+          const totalItems = freelancers.length;
+          const startIndex = (page - 1) * pageSize;
+          const paginatedFreelancers = freelancers.slice(startIndex, startIndex + pageSize);
+          
+          // Return the final result
+          return { 
+            data: {
+              items: paginatedFreelancers,
+              pagination: {
+                currentPage: page,
+                pageSize: pageSize,
+                totalItems: totalItems,
+                hasMore: startIndex + pageSize < totalItems,
+                lastVisible: null // Not needed for client-side pagination
+              }
+            } 
+          };
+        } catch (error: any) {
+          console.error("Error fetching freelancers:", error);
+          return { error: { status: 'CUSTOM_ERROR', error: error.message || "Failed to fetch freelancers" } };
         }
       },
       providesTags: ['User'],
@@ -1916,6 +2098,52 @@ export const firebaseApi = createApi({
       },
       invalidatesTags: ['User'],
     }),
+    
+    /**
+     * Update a user's profile image in both photoURL and about.profileUrl fields
+     */
+    updateUserProfileImage: builder.mutation<ApiResponse<User>, {
+      userId: string;
+      imageUrl: string;
+    }>({
+      queryFn: async ({ userId, imageUrl }) => {
+        try {
+          const userRef = doc(db, 'users', userId)
+          
+          // Update both photoURL and about.profileUrl for consistency
+          await updateDoc(userRef, {
+            photoURL: imageUrl,
+            'about.profileUrl': imageUrl,
+            updatedAt: new Date().toISOString()
+          })
+          
+          // Get the updated user data
+          const updatedDoc = await getDoc(userRef)
+          if (!updatedDoc.exists()) {
+            throw new Error('Failed to retrieve updated user data')
+          }
+          
+          const updatedUser = serializeUser({ userId, ...updatedDoc.data() })
+          
+          // If the user is also authenticated with Firebase Auth, update that profile too
+          const currentUser = auth.currentUser
+          if (currentUser && currentUser.uid === userId) {
+            await updateProfile(currentUser, { photoURL: imageUrl })
+          }
+          
+          return {
+            data: {
+              success: true,
+              message: 'Profile image updated successfully',
+              data: updatedUser
+            }
+          }
+        } catch (error: any) {
+          return { error: { status: 'CUSTOM_ERROR', error: error.message } }
+        }
+      },
+      invalidatesTags: ['User'],
+    }),
   }),
 })
 
@@ -1932,6 +2160,7 @@ export const {
   useUpdateProjectMutation,
   useGetProposalQuery,
   useGetProposalsQuery,
+  useUpdateUserProfileImageMutation,
   useCreateProposalMutation,
   useUpdateProposalMutation,
   // Progressive signup hooks
@@ -1953,4 +2182,6 @@ export const {
   // Profile management hooks
   useGetUserProfileQuery,
   useUpdateUserProfileMutation,
+  // Freelancer search hooks
+  useGetFreelancersQuery,
 } = firebaseApi
