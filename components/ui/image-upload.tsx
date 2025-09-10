@@ -7,8 +7,10 @@ import { Progress } from "@/components/ui/progress"
 import { Upload, X, User, Camera, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import Image from "next/image"
-import { uploadProfileImage, compressImage } from "@/lib/services/storageService"
+import { compressImage } from "@/lib/services/storageService"
 import { useAuth } from "@/components/auth-provider-redux"
+import { useProfileImage } from "@/lib/hooks/use-profile-image"
+import { useToast } from "@/hooks/use-toast"
 
 interface ImageUploadProps {
   value?: string
@@ -29,18 +31,15 @@ export default function ImageUpload({
   maxSize = 5,
   disabled = false
 }: ImageUploadProps) {
-  const [isUploading, setIsUploading] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState(0)
   const [preview, setPreview] = useState<string | null>(value || null)
   
   // Get current user from AuthProvider context (which reads from localStorage)
   const { user, loading } = useAuth()
   const userId = user?.userId
-
-  // Debug logging
-  console.log('ImageUpload - User:', user)
-  console.log('ImageUpload - UserId:', userId)
-  console.log('ImageUpload - Loading:', loading)
+  
+  // Use the profile image hook for uploading to Firebase Storage
+  const { updateProfileImage, isUploading, uploadProgress } = useProfileImage()
+  const { toast } = useToast()
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     if (disabled || isUploading || !userId) return
@@ -61,38 +60,43 @@ export default function ImageUpload({
     }
 
     try {
-      setIsUploading(true)
-      setUploadProgress(0)
-
-      // Create preview
+      // Create temporary preview
       const previewUrl = URL.createObjectURL(file)
       setPreview(previewUrl)
-
+      
       // Call the file selection callback
       onFileSelect?.(file)
 
       // Compress image if it's too large
       let fileToUpload = file
       if (file.size > 1024 * 1024) { // If larger than 1MB, compress
-        setUploadProgress(10)
         fileToUpload = await compressImage(file, 800, 0.8)
       }
 
-      setUploadProgress(20)
-
-      // For now, just set a preview URL and let the parent handle the actual upload
-      onChange(previewUrl)
-
+      // Upload to Firebase Storage and update both profile URL fields
+      const downloadUrl = await updateProfileImage(userId, fileToUpload)
+      
+      if (downloadUrl) {
+        // Update with the permanent Firebase Storage URL instead of the blob URL
+        onChange(downloadUrl)
+        setPreview(downloadUrl)
+        
+        // Release object URL to prevent memory leaks
+        URL.revokeObjectURL(previewUrl)
+      } else {
+        // Keep the blob URL temporarily but show an error
+        toast({
+          title: "Warning",
+          description: "Using temporary image preview. The image may not be saved permanently.",
+          variant: "destructive",
+        })
+      }
     } catch (error: any) {
-      setIsUploading(false)
-      setUploadProgress(0)
       setPreview(value || null) // Reset to original value
       onError?.(error.message || 'Failed to upload image. Please try again.')
       console.error('Upload error:', error)
-    } finally {
-      setIsUploading(false)
     }
-  }, [disabled, isUploading, maxSize, onChange, onError, onFileSelect, userId, value])
+  }, [disabled, isUploading, maxSize, onChange, onError, onFileSelect, updateProfileImage, userId, value, toast])
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -106,7 +110,7 @@ export default function ImageUpload({
   const removeImage = useCallback(() => {
     setPreview(null)
     onChange('')
-    setUploadProgress(0)
+    // No need to reset upload progress as it's handled by the hook
   }, [onChange])
 
   if (loading) {
@@ -144,11 +148,14 @@ export default function ImageUpload({
                 type="button"
                 variant="destructive"
                 size="sm"
-                className="absolute -top-2 -right-2 rounded-full w-8 h-8 p-0"
-                onClick={removeImage}
+                className="absolute -top-2 -right-2 rounded-full w-8 h-8 p-0 flex items-center justify-center"
+                onClick={(e) => {
+                  e.stopPropagation(); // Prevent event bubbling
+                  removeImage();
+                }}
                 disabled={isUploading}
               >
-                <X className="w-4 h-4" />
+                <X className="h-4 w-4" />
               </Button>
             )}
           </div>
@@ -200,10 +207,10 @@ export default function ImageUpload({
               variant="outline"
               size="sm"
               disabled={disabled || isUploading}
-              className="mx-auto"
+              className="mx-auto mt-2"
             >
               <Upload className="w-4 h-4 mr-2" />
-              Choose File
+              Select File
             </Button>
           </div>
         </div>
