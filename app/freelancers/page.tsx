@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useDispatch } from "react-redux"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -19,175 +20,16 @@ import {
   Briefcase,
   Award,
   CheckCircle,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  AlertCircle,
 } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
 import { Navigation } from "@/components/navigation"
-
-const freelancers = [
-  {
-    id: 1,
-    name: "Sarah Chen",
-    title: "Senior Full-Stack Developer",
-    avatar: "/professional-asian-woman-developer.png",
-    location: "San Francisco, CA",
-    hourlyRate: 85,
-    rating: 4.9,
-    reviewCount: 127,
-    completedJobs: 89,
-    responseTime: "1 hour",
-    availability: "Available now",
-    skills: ["React", "Node.js", "Python", "PostgreSQL", "AWS", "TypeScript"],
-    specialties: ["Web Development", "API Development", "Database Design"],
-    description:
-      "Experienced full-stack developer with 8+ years building scalable web applications. Specialized in React, Node.js, and cloud architecture. Delivered 100+ successful projects for startups and enterprises.",
-    portfolio: [
-      { title: "E-commerce Platform", image: "/ecommerce-website-homepage.png" },
-      { title: "SaaS Dashboard", image: "/general-dashboard-interface.png" },
-    ],
-    verified: true,
-    topRated: true,
-    featured: true,
-    languages: ["English (Native)", "Mandarin (Fluent)"],
-    education: "MS Computer Science - Stanford University",
-    certifications: ["AWS Certified", "Google Cloud Professional"],
-  },
-  {
-    id: 2,
-    name: "Marcus Johnson",
-    title: "Creative UI/UX Designer",
-    avatar: "/professional-black-designer.png",
-    location: "New York, NY",
-    hourlyRate: 75,
-    rating: 5.0,
-    reviewCount: 94,
-    completedJobs: 156,
-    responseTime: "30 minutes",
-    availability: "Available now",
-    skills: ["Figma", "Adobe XD", "Sketch", "Prototyping", "User Research", "Design Systems"],
-    specialties: ["Mobile App Design", "Web Design", "Brand Identity"],
-    description:
-      "Award-winning UI/UX designer with a passion for creating intuitive and beautiful digital experiences. 6+ years of experience working with Fortune 500 companies and innovative startups.",
-    portfolio: [
-      { title: "Mobile Banking App", image: "/mobile-banking-app.png" },
-      { title: "Brand Identity System", image: "/brand-identity-design.png" },
-    ],
-    verified: true,
-    topRated: true,
-    featured: false,
-    languages: ["English (Native)", "Spanish (Conversational)"],
-    education: "BFA Graphic Design - Parsons School of Design",
-    certifications: ["Google UX Design Certificate", "Adobe Certified Expert"],
-  },
-  {
-    id: 3,
-    name: "Elena Rodriguez",
-    title: "Digital Marketing Strategist",
-    avatar: "/latina-marketer.png",
-    location: "Austin, TX",
-    hourlyRate: 65,
-    rating: 4.8,
-    reviewCount: 203,
-    completedJobs: 234,
-    responseTime: "2 hours",
-    availability: "Available in 1 week",
-    skills: ["SEO", "Google Ads", "Facebook Ads", "Content Marketing", "Analytics", "Email Marketing"],
-    specialties: ["PPC Advertising", "SEO Strategy", "Social Media Marketing"],
-    description:
-      "Results-driven digital marketing expert with 7+ years helping businesses grow their online presence. Specialized in data-driven strategies that deliver measurable ROI.",
-    portfolio: [
-      { title: "SaaS Growth Campaign", image: "/marketing-campaign-results.png" },
-      { title: "E-commerce SEO Strategy", image: "/seo-analytics-dashboard.png" },
-    ],
-    verified: true,
-    topRated: false,
-    featured: true,
-    languages: ["English (Native)", "Spanish (Native)"],
-    education: "MBA Marketing - University of Texas",
-    certifications: ["Google Ads Certified", "HubSpot Certified", "Facebook Blueprint"],
-  },
-  {
-    id: 4,
-    name: "David Kim",
-    title: "Mobile App Developer",
-    avatar: "/asian-mobile-developer.png",
-    location: "Seattle, WA",
-    hourlyRate: 80,
-    rating: 4.7,
-    reviewCount: 156,
-    completedJobs: 78,
-    responseTime: "1 hour",
-    availability: "Available now",
-    skills: ["React Native", "Flutter", "iOS", "Android", "Firebase", "Swift"],
-    specialties: ["Cross-platform Development", "Native iOS", "App Store Optimization"],
-    description:
-      "Mobile app developer with 6+ years of experience creating high-performance apps for iOS and Android. Expert in React Native and Flutter with 50+ apps published.",
-    portfolio: [
-      { title: "Fitness Tracking App", image: "/fitness-mobile-app-interface.png" },
-      { title: "Food Delivery Platform", image: "/food-delivery-app-screen.png" },
-    ],
-    verified: true,
-    topRated: true,
-    featured: false,
-    languages: ["English (Fluent)", "Korean (Native)"],
-    education: "BS Computer Science - University of Washington",
-    certifications: ["Apple Developer Certified", "Google Associate Android Developer"],
-  },
-  {
-    id: 5,
-    name: "Sophia Williams",
-    title: "Content Writer & Copywriter",
-    avatar: "/professional-woman-writer.png",
-    location: "Remote",
-    hourlyRate: 45,
-    rating: 4.9,
-    reviewCount: 312,
-    completedJobs: 445,
-    responseTime: "4 hours",
-    availability: "Available now",
-    skills: ["Content Writing", "Copywriting", "SEO Writing", "Blog Writing", "Technical Writing", "Email Marketing"],
-    specialties: ["B2B Content", "SaaS Writing", "Email Campaigns"],
-    description:
-      "Professional content writer and copywriter with 5+ years creating compelling content that converts. Specialized in B2B SaaS, technology, and marketing content.",
-    portfolio: [
-      { title: "SaaS Blog Content", image: "/blog-content-writing.png" },
-      { title: "Email Campaign Series", image: "/email-marketing-campaign.png" },
-    ],
-    verified: true,
-    topRated: true,
-    featured: false,
-    languages: ["English (Native)", "French (Conversational)"],
-    education: "BA English Literature - Columbia University",
-    certifications: ["HubSpot Content Marketing", "Google Analytics Certified"],
-  },
-  {
-    id: 6,
-    name: "Ahmed Hassan",
-    title: "Data Scientist & ML Engineer",
-    avatar: "/middle-eastern-data-scientist.png",
-    location: "Toronto, Canada",
-    hourlyRate: 90,
-    rating: 4.8,
-    reviewCount: 87,
-    completedJobs: 52,
-    responseTime: "3 hours",
-    availability: "Available in 2 weeks",
-    skills: ["Python", "Machine Learning", "TensorFlow", "PyTorch", "SQL", "R"],
-    specialties: ["Predictive Analytics", "Computer Vision", "NLP"],
-    description:
-      "Data scientist and ML engineer with PhD in Computer Science. 8+ years of experience building AI solutions for healthcare, finance, and e-commerce industries.",
-    portfolio: [
-      { title: "Predictive Analytics Model", image: "/data-analytics-dashboard.png" },
-      { title: "Computer Vision System", image: "/computer-vision-interface.png" },
-    ],
-    verified: true,
-    topRated: true,
-    featured: true,
-    languages: ["English (Fluent)", "Arabic (Native)", "French (Conversational)"],
-    education: "PhD Computer Science - University of Toronto",
-    certifications: ["AWS Machine Learning", "Google Cloud ML Engineer", "Microsoft Azure AI"],
-  },
-]
+import { useGetFreelancersQuery } from "@/lib/redux/api/firebaseApi"
+import { useToast } from "@/hooks/use-toast"
 
 const categories = [
   "All Categories",
@@ -206,34 +48,140 @@ const experienceLevels = ["All Levels", "Entry Level", "Intermediate", "Expert"]
 const locations = ["All Locations", "United States", "Canada", "United Kingdom", "Australia", "Remote Only"]
 
 export default function FreelancersPage() {
+  const dispatch = useDispatch()
+  const { toast } = useToast()
+  
+  // Search and filter state
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("All Categories")
   const [selectedExperience, setSelectedExperience] = useState("All Levels")
   const [selectedLocation, setSelectedLocation] = useState("All Locations")
   const [hourlyRateRange, setHourlyRateRange] = useState([0, 150])
   const [showFilters, setShowFilters] = useState(false)
-  const [sortBy, setSortBy] = useState("rating")
+  const [sortBy, setSortBy] = useState("bestMatch")
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [lastVisible, setLastVisible] = useState<any>(null)
+  const pageSize = 10
 
-  const filteredFreelancers = freelancers.filter((freelancer) => {
-    const matchesSearch =
-      freelancer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      freelancer.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      freelancer.skills.some((skill) => skill.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      freelancer.description.toLowerCase().includes(searchQuery.toLowerCase())
-
-    const matchesCategory =
-      selectedCategory === "All Categories" ||
-      freelancer.specialties.some((specialty) => specialty.includes(selectedCategory.replace(" Development", "")))
-
-    const matchesLocation =
-      selectedLocation === "All Locations" ||
-      freelancer.location.includes(selectedLocation) ||
-      (selectedLocation === "Remote Only" && freelancer.location === "Remote")
-
-    const matchesRate = freelancer.hourlyRate >= hourlyRateRange[0] && freelancer.hourlyRate <= hourlyRateRange[1]
-
-    return matchesSearch && matchesCategory && matchesLocation && matchesRate
-  })
+  // Debounced search to avoid too many API calls
+  const [debouncedSearch, setDebouncedSearch] = useState(searchQuery)
+  
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery)
+    }, 500)
+    
+    return () => clearTimeout(timer)
+  }, [searchQuery])
+  
+  // Convert UI sort options to API sort options
+  const getSortOption = () => {
+    switch(sortBy) {
+      case "rating": return "rating"
+      case "rate-low": return "hourRate"
+      case "rate-high": return "hourRateDesc"
+      case "reviews": return "reviewCount"
+      default: return "bestMatch"
+    }
+  }
+  
+  // Fetch freelancers with filters
+  const {
+    data: freelancersData,
+    isLoading,
+    isFetching,
+    isError,
+    error,
+    refetch
+  } = useGetFreelancersQuery({
+    page: currentPage,
+    pageSize,
+    lastVisible,
+    filters: {
+      searchQuery: debouncedSearch,
+      category: selectedCategory,
+      location: selectedLocation,
+      experienceLevel: selectedExperience === "All Levels" ? undefined : selectedExperience,
+      minRate: hourlyRateRange[0],
+      maxRate: hourlyRateRange[1],
+    },
+    sortBy: getSortOption(),
+  }, { refetchOnMountOrArgChange: true })
+  
+  // Extract freelancer data
+  const freelancers = freelancersData?.items || []
+  const pagination = freelancersData?.pagination
+  
+  // Handle pagination
+  const handleNextPage = () => {
+    if (pagination?.hasMore) {
+      setCurrentPage(prev => prev + 1)
+      setLastVisible(pagination.lastVisible)
+    }
+  }
+  
+  const handlePreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(prev => prev - 1)
+      setLastVisible(null) // Reset last visible when going back
+    }
+  }
+  
+  // Handle search and filter changes
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value)
+    setCurrentPage(1)
+    setLastVisible(null)
+  }
+  
+  const handleFilterChange = () => {
+    setCurrentPage(1)
+    setLastVisible(null)
+    refetch()
+  }
+  
+  // Format hourly rate from string to display value
+  const formatHourlyRate = (rateString: string | undefined) => {
+    if (!rateString) return 0
+    // Extract numeric value from hourRate string (e.g., "$ 20" -> 20)
+    return parseFloat(rateString.replace(/[^0-9.]/g, '')) || 0
+  }
+  
+  // Get freelancer availability status
+  const getFreelancerAvailability = (freelancer: any) => {
+    return freelancer?.preferences?.availability || "available"
+  }
+  
+  // Get freelancer response time (estimated)
+  const getResponseTime = (freelancer: any) => {
+    // This could be based on actual data from Firebase in the future
+    const responseRateScore = freelancer?.stats?.responseRate || 0
+    
+    if (responseRateScore > 90) return "1 hour"
+    if (responseRateScore > 80) return "2 hours"
+    if (responseRateScore > 70) return "4 hours"
+    return "24 hours"
+  }
+  
+  // Format skills for display
+  const getFreelancerSkills = (freelancer: any) => {
+    return freelancer?.skills?.map((skill: any) => skill.text) || []
+  }
+  
+  // Check if freelancer is verified
+  const isFreelancerVerified = (freelancer: any) => {
+    return freelancer?.isVerified || false
+  }
+  
+  // Check if freelancer is top rated
+  const isTopRated = (freelancer: any) => {
+    const rating = freelancer?.stats?.averageRating || 0
+    const completedJobs = freelancer?.stats?.completedJobs || 0
+    
+    return rating >= 4.5 && completedJobs >= 10
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -257,7 +205,7 @@ export default function FreelancersPage() {
                   type="text"
                   placeholder="Search freelancers by name, skills, or expertise..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={handleSearchChange}
                   className="pl-10 pr-4 py-3 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-0"
                 />
               </div>
@@ -277,7 +225,10 @@ export default function FreelancersPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t border-gray-200">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
-                <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                <Select value={selectedCategory} onValueChange={(value) => {
+                  setSelectedCategory(value);
+                  handleFilterChange();
+                }}>
                   <SelectTrigger className="rounded-xl">
                     <SelectValue />
                   </SelectTrigger>
@@ -293,7 +244,10 @@ export default function FreelancersPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
-                <Select value={selectedLocation} onValueChange={setSelectedLocation}>
+                <Select value={selectedLocation} onValueChange={(value) => {
+                  setSelectedLocation(value);
+                  handleFilterChange();
+                }}>
                   <SelectTrigger className="rounded-xl">
                     <SelectValue />
                   </SelectTrigger>
@@ -309,11 +263,15 @@ export default function FreelancersPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Sort By</label>
-                <Select value={sortBy} onValueChange={setSortBy}>
+                <Select value={sortBy} onValueChange={(value) => {
+                  setSortBy(value);
+                  handleFilterChange();
+                }}>
                   <SelectTrigger className="rounded-xl">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="bestMatch">Best Match</SelectItem>
                     <SelectItem value="rating">Highest Rated</SelectItem>
                     <SelectItem value="rate-low">Lowest Rate</SelectItem>
                     <SelectItem value="rate-high">Highest Rate</SelectItem>
@@ -328,7 +286,8 @@ export default function FreelancersPage() {
                 </label>
                 <Slider
                   value={hourlyRateRange}
-                  onValueChange={setHourlyRateRange}
+                  onValueChange={(value) => setHourlyRateRange(value)}
+                  onValueCommit={handleFilterChange}
                   max={150}
                   min={0}
                   step={5}
@@ -342,121 +301,193 @@ export default function FreelancersPage() {
         {/* Results Summary */}
         <div className="flex justify-between items-center mb-6">
           <p className="text-gray-600">
-            Showing {filteredFreelancers.length} of {freelancers.length} freelancers
+            {isLoading ? (
+              "Loading freelancers..."
+            ) : (
+              `Showing ${freelancers.length} ${pagination?.totalItems ? `of ${pagination.totalItems}` : ""} freelancers`
+            )}
           </p>
         </div>
 
+        {/* Loading state */}
+        {isLoading && (
+          <div className="flex flex-col items-center justify-center py-12">
+            <Loader2 className="w-12 h-12 text-blue-500 animate-spin mb-4" />
+            <p className="text-gray-600">Loading freelancers...</p>
+          </div>
+        )}
+        
+        {/* Error state */}
+        {isError && (
+          <div className="flex flex-col items-center justify-center py-12 bg-red-50 rounded-lg">
+            <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Failed to load freelancers</h3>
+            <p className="text-gray-600 mb-4">
+              {error ? "There was an error loading freelancer data." : "There was an error loading freelancer data. Please try again."}
+            </p>
+            <Button onClick={() => refetch()} className="bg-blue-600 hover:bg-blue-700 text-white">
+              Retry
+            </Button>
+          </div>
+        )}
+
+        {/* No results */}
+        {!isLoading && !isError && freelancers.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-12 bg-gray-50 rounded-lg">
+            <Search className="w-12 h-12 text-gray-400 mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No freelancers found</h3>
+            <p className="text-gray-600 mb-4">
+              Try adjusting your search or filters to find more results.
+            </p>
+            <Button 
+              onClick={() => {
+                setSearchQuery("");
+                setSelectedCategory("All Categories");
+                setSelectedLocation("All Locations");
+                setSelectedExperience("All Levels");
+                setHourlyRateRange([0, 150]);
+                handleFilterChange();
+              }} 
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              Clear Filters
+            </Button>
+          </div>
+        )}
+
         {/* Freelancers Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {filteredFreelancers.map((freelancer) => (
-            <Card key={freelancer.id} className="hover:shadow-xl transition-all duration-300 border-0 shadow-lg">
-              <CardContent className="p-6">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="flex items-center">
-                    <Image
-                      src={freelancer.avatar || "/placeholder.svg"}
-                      alt={freelancer.name}
-                      width={64}
-                      height={64}
-                      className="w-16 h-16 rounded-full object-cover mr-4"
-                    />
-                    <div>
-                      <div className="flex items-center mb-1">
-                        <h3 className="text-lg font-semibold text-gray-900 mr-2">{freelancer.name}</h3>
-                        {freelancer.verified && <CheckCircle className="w-4 h-4 text-blue-500" />}
-                        {freelancer.topRated && <Award className="w-4 h-4 text-yellow-500 ml-1" />}
+        {!isLoading && !isError && freelancers.length > 0 && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {freelancers.map((freelancer: any) => (
+              <Card key={freelancer.userId} className="hover:shadow-xl transition-all duration-300 border-0 shadow-lg">
+                <CardContent className="p-6">
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex items-center">
+                      <Image
+                        src={freelancer.photoURL || "/placeholder-user.jpg"}
+                        alt={freelancer.displayName || "Freelancer"}
+                        width={64}
+                        height={64}
+                        className="w-16 h-16 rounded-full object-cover mr-4"
+                      />
+                      <div>
+                        <div className="flex items-center mb-1">
+                          <h3 className="text-lg font-semibold text-gray-900 mr-2">{freelancer.displayName}</h3>
+                          {isFreelancerVerified(freelancer) && <CheckCircle className="w-4 h-4 text-blue-500" />}
+                          {isTopRated(freelancer) && <Award className="w-4 h-4 text-yellow-500 ml-1" />}
+                        </div>
+                        <p className="text-gray-600 mb-1">{freelancer.title}</p>
+                        <div className="flex items-center text-sm text-gray-500">
+                          <MapPin className="w-3 h-3 mr-1" />
+                          <span>{freelancer.about?.country || "Remote"}</span>
+                        </div>
                       </div>
-                      <p className="text-gray-600 mb-1">{freelancer.title}</p>
-                      <div className="flex items-center text-sm text-gray-500">
-                        <MapPin className="w-3 h-3 mr-1" />
-                        <span>{freelancer.location}</span>
-                      </div>
                     </div>
-                  </div>
-                  <Button variant="ghost" size="sm">
-                    <Heart className="w-4 h-4" />
-                  </Button>
-                </div>
-
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center space-x-4">
-                    <div className="flex items-center">
-                      <Star className="w-4 h-4 text-yellow-400 fill-current mr-1" />
-                      <span className="font-medium text-gray-900">{freelancer.rating}</span>
-                      <span className="text-gray-600 ml-1">({freelancer.reviewCount})</span>
-                    </div>
-                    <div className="flex items-center text-gray-600">
-                      <Briefcase className="w-4 h-4 mr-1" />
-                      <span>{freelancer.completedJobs} jobs</span>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-2xl font-bold text-gray-900">${freelancer.hourlyRate}</div>
-                    <div className="text-sm text-gray-600">/hour</div>
-                  </div>
-                </div>
-
-                <p className="text-gray-700 mb-4 line-clamp-3">{freelancer.description}</p>
-
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {freelancer.skills.slice(0, 6).map((skill, index) => (
-                    <Badge key={index} variant="secondary" className="text-xs">
-                      {skill}
-                    </Badge>
-                  ))}
-                  {freelancer.skills.length > 6 && (
-                    <Badge variant="outline" className="text-xs">
-                      +{freelancer.skills.length - 6} more
-                    </Badge>
-                  )}
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4 text-sm text-gray-600">
-                    <div className="flex items-center">
-                      <Clock className="w-3 h-3 mr-1" />
-                      <span>Responds in {freelancer.responseTime}</span>
-                    </div>
-                    <div className="flex items-center">
-                      <div
-                        className={`w-2 h-2 rounded-full mr-1 ${
-                          freelancer.availability === "Available now" ? "bg-green-500" : "bg-yellow-500"
-                        }`}
-                      ></div>
-                      <span>{freelancer.availability}</span>
-                    </div>
-                  </div>
-                  <div className="flex space-x-2">
-                    <Button variant="outline" size="sm" className="rounded-xl bg-transparent">
-                      <MessageSquare className="w-4 h-4 mr-1" />
-                      Message
+                    <Button variant="ghost" size="sm">
+                      <Heart className="w-4 h-4" />
                     </Button>
-                    <Link href={`/freelancers/${freelancer.id}`}>
-                      <Button
-                        size="sm"
-                        className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl"
-                      >
-                        View Profile
-                      </Button>
-                    </Link>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
 
-        {/* Load More */}
-        <div className="text-center mt-12">
-          <Button
-            size="lg"
-            variant="outline"
-            className="border-2 border-blue-500 text-blue-600 hover:bg-blue-500 hover:text-white px-8 py-4 rounded-2xl bg-transparent"
-          >
-            Load More Freelancers
-          </Button>
-        </div>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center space-x-4">
+                      <div className="flex items-center">
+                        <Star className="w-4 h-4 text-yellow-400 fill-current mr-1" />
+                        <span className="font-medium text-gray-900">{freelancer.stats?.averageRating?.toFixed(1) || "New"}</span>
+                        <span className="text-gray-600 ml-1">({freelancer.stats?.totalReviews || 0})</span>
+                      </div>
+                      <div className="flex items-center text-gray-600">
+                        <Briefcase className="w-4 h-4 mr-1" />
+                        <span>{freelancer.stats?.completedJobs || 0} jobs</span>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-2xl font-bold text-gray-900">${formatHourlyRate(freelancer.hourRate)}</div>
+                      <div className="text-sm text-gray-600">/hour</div>
+                    </div>
+                  </div>
+
+                  <p className="text-gray-700 mb-4 line-clamp-3">{freelancer.overview || "No overview provided"}</p>
+
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    {getFreelancerSkills(freelancer).slice(0, 6).map((skill: string, index: number) => (
+                      <Badge key={index} variant="secondary" className="text-xs">
+                        {skill}
+                      </Badge>
+                    ))}
+                    {getFreelancerSkills(freelancer).length > 6 && (
+                      <Badge variant="outline" className="text-xs">
+                        +{getFreelancerSkills(freelancer).length - 6} more
+                      </Badge>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4 text-sm text-gray-600">
+                      <div className="flex items-center">
+                        <Clock className="w-3 h-3 mr-1" />
+                        <span>Responds in {getResponseTime(freelancer)}</span>
+                      </div>
+                      <div className="flex items-center">
+                        <div
+                          className={`w-2 h-2 rounded-full mr-1 ${
+                            getFreelancerAvailability(freelancer) === "available" ? "bg-green-500" : "bg-yellow-500"
+                          }`}
+                        ></div>
+                        <span>{getFreelancerAvailability(freelancer) === "available" ? "Available now" : "Busy"}</span>
+                      </div>
+                    </div>
+                    <div className="flex space-x-2">
+                      <Button variant="outline" size="sm" className="rounded-xl bg-transparent">
+                        <MessageSquare className="w-4 h-4 mr-1" />
+                        Message
+                      </Button>
+                      <Link href={`/profile/${freelancer.userId}`}>
+                        <Button
+                          size="sm"
+                          className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl"
+                        >
+                          View Profile
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {/* Pagination */}
+        {!isLoading && !isError && freelancers.length > 0 && (
+          <div className="flex justify-center items-center mt-12 space-x-4">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handlePreviousPage}
+              disabled={currentPage === 1 || isFetching}
+              className="border-gray-300 text-gray-700"
+            >
+              <ChevronLeft className="w-4 h-4 mr-1" />
+              Previous
+            </Button>
+            
+            <div className="text-gray-700">
+              Page {currentPage}
+            </div>
+            
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleNextPage}
+              disabled={!pagination?.hasMore || isFetching}
+              className="border-gray-300 text-gray-700"
+            >
+              Next
+              <ChevronRight className="w-4 h-4 ml-1" />
+            </Button>
+          </div>
+        )}
       </div>
     </div>
-  )
+  );
 }
