@@ -27,11 +27,12 @@ import {
   PauseCircle,
   XCircle,
   Briefcase,
-  RefreshCw
+  RefreshCw,
+  FileText
 } from "lucide-react"
 import { updateDraftProjectsToActive } from "@/lib/utils/updateProjectStatus"
 
-const ProjectCard = ({ project, onViewDetails, onEdit }: any) => {
+const ProjectCard = ({ project, onViewDetails, onEdit, router }: any) => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active': return 'bg-emerald-50 text-emerald-700 border-emerald-200'
@@ -125,17 +126,17 @@ const ProjectCard = ({ project, onViewDetails, onEdit }: any) => {
   }
 
   return (
-    <Card className="group hover:shadow-xl transition-all duration-300 border border-slate-200 bg-white overflow-hidden relative">
+    <Card className="group hover:shadow-xl transition-all duration-300 border border-slate-200 bg-white overflow-hidden relative w-full">
       {/* Hover overlay - only appears on card hover */}
       <div className="absolute inset-0 bg-gradient-to-br from-blue-50/30 to-green-50/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none" />
       
       <CardHeader className="relative pb-4 border-b border-slate-100 z-10">
-        <div className="flex items-start justify-between mb-3">
+        <div className="flex flex-col md:flex-row md:items-start justify-between mb-3 gap-4">
           <div className="flex-1">
             <CardTitle className="text-xl font-bold text-slate-800 mb-2 line-clamp-2 leading-tight">
               {project.title}
             </CardTitle>
-            <div className="flex items-center gap-2 mb-3">
+            <div className="flex flex-wrap items-center gap-2 mb-3">
               <Badge className={`${getStatusColor(project.status)} border font-medium px-3 py-1`}>
                 <div className="flex items-center space-x-1.5">
                   {getStatusIcon(project.status)}
@@ -153,9 +154,15 @@ const ProjectCard = ({ project, onViewDetails, onEdit }: any) => {
                   ⭐ Featured
                 </Badge>
               )}
+              {project.proposalCount > 0 && (
+                <Badge className="bg-blue-50 text-blue-600 border border-blue-200 font-medium">
+                  <FileText className="w-3 h-3 mr-1" />
+                  {project.proposalCount} Proposal{project.proposalCount !== 1 ? 's' : ''}
+                </Badge>
+              )}
             </div>
           </div>
-          <div className="text-right">
+          <div className="text-left md:text-right">
             <div className="text-2xl font-bold text-emerald-600 mb-1">
               {formatBudget(project)}
             </div>
@@ -172,7 +179,7 @@ const ProjectCard = ({ project, onViewDetails, onEdit }: any) => {
       
       <CardContent className="relative pt-4 space-y-4 z-10">
         {/* Project Details Grid */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="space-y-3">
             <div className="flex items-center space-x-2 text-sm">
               <div className="p-1.5 bg-blue-100 rounded-lg">
@@ -183,7 +190,9 @@ const ProjectCard = ({ project, onViewDetails, onEdit }: any) => {
                 <div className="font-medium text-slate-700">{formatTimeline(project)}</div>
               </div>
             </div>
-            
+          </div>
+          
+          <div className="space-y-3">
             <div className="flex items-center space-x-2 text-sm">
               <div className="p-1.5 bg-primary-green/10 rounded-lg">
                 <Users className="w-4 h-4 text-primary-green-dark" />
@@ -205,7 +214,9 @@ const ProjectCard = ({ project, onViewDetails, onEdit }: any) => {
                 <div className="font-medium text-slate-700">{project.category || 'General'}</div>
               </div>
             </div>
-            
+          </div>
+          
+          <div className="space-y-3">
             <div className="flex items-center space-x-2 text-sm">
               <div className="p-1.5 bg-orange-100 rounded-lg">
                 <Clock className="w-4 h-4 text-orange-600" />
@@ -252,6 +263,18 @@ const ProjectCard = ({ project, onViewDetails, onEdit }: any) => {
           </div>
           
           <div className="flex items-center space-x-2">
+            {/* Show "View Proposals" button if there are any proposals */}
+            {project.proposalCount > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => router.push(`/client/projects/${project.projectId}/proposals`)}
+                className="text-xs bg-white hover:bg-slate-50 border-slate-200 text-blue-600"
+              >
+                <FileText className="w-3 h-3 mr-1" />
+                View Proposal{project.proposalCount !== 1 ? 's' : ''}
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"
@@ -264,7 +287,7 @@ const ProjectCard = ({ project, onViewDetails, onEdit }: any) => {
             <Button
               size="sm"
               onClick={() => onEdit(project.projectId)}
-              className="text-xs bg-gradient-to-r from-primary-blue to-primary-green hover:from-primary-blue-dark hover:to-primary-green-dark text-white border-0 shadow-sm"
+              className="text-xs bg-primary-blue-light hover:bg-primary-blue-dark text-white border-0 shadow-sm"
             >
               <Edit className="w-3 h-3 mr-1" />
               Edit
@@ -396,7 +419,7 @@ export default function ClientProjectsPage() {
                 <p className="text-slate-600 mb-6">We encountered an issue while fetching your projects. Please try again.</p>
                 <Button 
                   onClick={() => window.location.reload()} 
-                  className="bg-gradient-to-r from-primary-blue to-primary-green hover:from-primary-blue-dark hover:to-primary-green-dark text-white"
+                  className="bg-primary-blue-light hover:bg-primary-blue-dark text-white"
                 >
                   Try Again
                 </Button>
@@ -423,7 +446,7 @@ export default function ClientProjectsPage() {
             <Button 
               onClick={handleCreateProject}
               size="lg"
-              className="bg-gradient-to-r from-primary-blue to-primary-green hover:from-primary-blue-dark hover:to-primary-green-dark text-white shadow-lg hover:shadow-xl transition-all duration-300 px-6 py-3"
+              className="bg-primary-blue-light hover:bg-primary-blue-dark text-white shadow-lg hover:shadow-xl transition-all duration-300 px-6 py-3"
             >
               <Plus className="w-5 h-5 mr-2" />
               Post New Project
@@ -590,7 +613,7 @@ export default function ClientProjectsPage() {
                     <Button 
                       onClick={handleCreateProject}
                       size="lg"
-                      className="bg-gradient-to-r from-primary-blue to-primary-green hover:from-primary-blue-dark hover:to-primary-green-dark text-white shadow-lg hover:shadow-xl transition-all duration-300 px-8 py-3"
+                      className="bg-primary-blue hover:bg-primary-blue-dark text-white shadow-lg hover:shadow-xl transition-all duration-300 px-8 py-3"
                     >
                       <Plus className="w-5 h-5 mr-2" />
                       Post Your First Project
@@ -599,13 +622,14 @@ export default function ClientProjectsPage() {
                 </CardContent>
               </Card>
             ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8">
+              <div className="grid grid-cols-1 gap-6">
                 {filteredProjects.map((project: any) => (
                   <ProjectCard
                     key={project.projectId}
                     project={project}
                     onViewDetails={handleViewDetails}
                     onEdit={handleEditProject}
+                    router={router}
                   />
                 ))}
               </div>
