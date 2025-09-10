@@ -707,10 +707,14 @@ export interface ApiResponse<T> {
 
 // Pagination response
 export interface PaginatedResponse<T> {
-  data: T[];
-  hasMore: boolean;
-  lastDoc: any;
-  total?: number;
+  items: T[];
+  pagination: {
+    currentPage: number;
+    pageSize: number;
+    totalItems: number;
+    hasMore: boolean;
+    lastVisible: any;
+  };
 }
 
 // Search filters
