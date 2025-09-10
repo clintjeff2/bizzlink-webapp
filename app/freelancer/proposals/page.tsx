@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Navigation } from "@/components/navigation"
+import { ConfirmModal } from "@/components/modals/confirm-modal"
 import { Search, Calendar, Clock, User, FileText, CheckCircle, XCircle, Eye, MessageSquare, Send, AlertCircle, Star, MapPin } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
@@ -215,20 +216,43 @@ export default function FreelancerProposalsPage() {
     }
   }, [reduxProposals, reduxError]);
 
+  const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
+  const [proposalToWithdraw, setProposalToWithdraw] = useState<string | null>(null);
+
   // Handle proposal withdrawal
-  const handleWithdrawProposal = async (proposalId: string) => {
-    if (!confirm("Are you sure you want to withdraw this proposal? This action cannot be undone.")) {
-      return;
-    }
+  const openWithdrawModal = (proposalId: string) => {
+    setProposalToWithdraw(proposalId);
+    setIsWithdrawModalOpen(true);
+  };
+  
+  const handleWithdrawProposal = async () => {
+    if (!proposalToWithdraw) return;
     
     try {
-      await dispatch(withdrawProposal(proposalId));
+      // Optimistically update the UI
+      const optimisticProposals = proposals.map(p => 
+        p.proposalId === proposalToWithdraw 
+          ? { ...p, status: 'withdrawn' } 
+          : p
+      );
+      setProposals(optimisticProposals);
+      
+      // Dispatch the action to update in Firebase
+      await dispatch(withdrawProposal(proposalToWithdraw));
+      
       toast({
         title: "Proposal withdrawn",
         description: "Your proposal has been successfully withdrawn.",
       });
+      
+      // The Redux store will update automatically via the subscription
+      setProposalToWithdraw(null);
     } catch (err) {
       console.error('Error withdrawing proposal:', err);
+      
+      // Revert to original data on error
+      setProposals(reduxProposals);
+      
       toast({
         title: "Error",
         description: "Failed to withdraw proposal. Please try again.",
@@ -243,7 +267,13 @@ export default function FreelancerProposalsPage() {
       case "submitted":
         return "pending";
       case "shortlisted":
-        return "interviewing";
+        return "shortlisted";
+      case "accepted":
+        return "accepted";
+      case "rejected":
+        return "rejected";
+      case "withdrawn":
+        return "withdrawn";
       default:
         return status;
     }
@@ -263,9 +293,9 @@ export default function FreelancerProposalsPage() {
     })
     .sort((a, b) => {
       if (sortBy === "newest") {
-        return b.submittedAt.toDate().getTime() - a.submittedAt.toDate().getTime();
+        return new Date(b.submittedAt || 0).getTime() - new Date(a.submittedAt || 0).getTime();
       } else if (sortBy === "oldest") {
-        return a.submittedAt.toDate().getTime() - b.submittedAt.toDate().getTime();
+        return new Date(a.submittedAt || 0).getTime() - new Date(b.submittedAt || 0).getTime();
       } else if (sortBy === "amount_high") {
         return b.bid.amount - a.bid.amount;
       } else if (sortBy === "amount_low") {
@@ -278,12 +308,12 @@ export default function FreelancerProposalsPage() {
     const mappedStatus = mapStatusToDisplay(status);
     switch (mappedStatus) {
       case "pending":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300";
+        return "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300";
       case "accepted":
         return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300";
       case "rejected":
         return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300";
-      case "interviewing":
+      case "shortlisted":
         return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300";
       case "withdrawn":
         return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300";
@@ -301,8 +331,8 @@ export default function FreelancerProposalsPage() {
         return <CheckCircle className="w-4 h-4" />;
       case "rejected":
         return <XCircle className="w-4 h-4" />;
-      case "interviewing":
-        return <User className="w-4 h-4" />;
+      case "shortlisted":
+        return <Star className="w-4 h-4" />;
       case "withdrawn":
         return <AlertCircle className="w-4 h-4" />;
       default:
@@ -312,12 +342,23 @@ export default function FreelancerProposalsPage() {
 
   // Use statistics from Redux store
   const { total: totalProposals, submitted: pendingProposals, shortlisted: shortlistedProposals, 
-    accepted: acceptedProposals } = useAppSelector(selectProposalStats);
-  const interviewingProposals = shortlistedProposals; // Shortlisted is our "interviewing" status
+    accepted: acceptedProposals, rejected: rejectedProposals, withdrawn: withdrawnProposals } = useAppSelector(selectProposalStats);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <Navigation />
+      
+      {/* Withdraw Confirmation Modal */}
+      <ConfirmModal
+        isOpen={isWithdrawModalOpen}
+        onClose={() => setIsWithdrawModalOpen(false)}
+        onConfirm={handleWithdrawProposal}
+        title="Withdraw Proposal"
+        description="Are you sure you want to withdraw this proposal? This action cannot be undone."
+        confirmText="Yes, withdraw"
+        cancelText="Cancel"
+        variant="destructive"
+      />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
@@ -360,11 +401,11 @@ export default function FreelancerProposalsPage() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Interviewing</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{interviewingProposals}</p>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Shortlisted</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{shortlistedProposals}</p>
                 </div>
-                <div className="p-3 bg-purple-100 dark:bg-purple-900 rounded-2xl">
-                  <User className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                <div className="p-3 bg-blue-100 dark:bg-blue-900 rounded-2xl">
+                  <Star className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                 </div>
               </div>
             </CardContent>
@@ -405,9 +446,10 @@ export default function FreelancerProposalsPage() {
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
                   <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="interviewing">Interviewing</SelectItem>
+                  <SelectItem value="shortlisted">Shortlisted</SelectItem>
                   <SelectItem value="accepted">Accepted</SelectItem>
                   <SelectItem value="rejected">Rejected</SelectItem>
+                  <SelectItem value="withdrawn">Withdrawn</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={sortBy} onValueChange={setSortBy}>
@@ -447,6 +489,7 @@ export default function FreelancerProposalsPage() {
                   proposal.status === "shortlisted" ? "bg-blue-500" :
                   proposal.status === "rejected" ? "bg-red-500" :
                   proposal.status === "withdrawn" ? "bg-gray-500" :
+                  proposal.status === "submitted" ? "bg-amber-500" :
                   "gradient-bg-2"
                 }`}></div>
                 
@@ -620,7 +663,7 @@ export default function FreelancerProposalsPage() {
                           variant="outline" 
                           size="sm"
                           className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          onClick={() => handleWithdrawProposal(proposal.proposalId)}>
+                          onClick={() => openWithdrawModal(proposal.proposalId)}>
                           Withdraw
                         </Button>
                       )}
