@@ -257,23 +257,49 @@ export const fetchProposal = createAsyncThunk(
 
 export const updateProposalStatus = createAsyncThunk(
   'proposals/updateProposalStatus',
-  async ({ proposalId, status }: { proposalId: string, status: Proposal['status'] }, { rejectWithValue }) => {
+  async ({ 
+    proposalId, 
+    status, 
+    updates = {} 
+  }: { 
+    proposalId: string, 
+    status?: Proposal['status'], 
+    updates?: Record<string, any> 
+  }, { rejectWithValue }) => {
     try {
       const docRef = doc(db, 'proposals', proposalId);
       
       // Create Firestore Timestamp for database
-      const firestoreUpdatedData = {
-        status,
+      const firestoreUpdatedData: Record<string, any> = {
         updatedAt: Timestamp.now(),
+        ...updates
       };
+
+      // Add status if provided
+      if (status) {
+        firestoreUpdatedData.status = status;
+      }
       
       await updateDoc(docRef, firestoreUpdatedData);
       
       // Return serialized data for Redux
-      const serializedUpdates = {
-        status,
+      const serializedUpdates: Record<string, any> = {
         updatedAt: serializeTimestamp(firestoreUpdatedData.updatedAt),
       };
+
+      // Add status if provided
+      if (status) {
+        serializedUpdates.status = status;
+      }
+
+      // Add any other updates
+      Object.keys(updates).forEach(key => {
+        if (updates[key] instanceof Timestamp) {
+          serializedUpdates[key] = serializeTimestamp(updates[key]);
+        } else {
+          serializedUpdates[key] = updates[key];
+        }
+      });
       
       return { proposalId, updates: serializedUpdates };
     } catch (error) {
