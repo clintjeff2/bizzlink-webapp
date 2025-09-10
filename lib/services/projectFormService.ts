@@ -137,7 +137,8 @@ export function convertFormDataToProject(
     fileUrl: string;
     fileType: string;
     uploadedAt: string;
-  }>
+  }>,
+  existingProject?: Partial<Project> // Optional existing project data to preserve important fields
 ): Omit<Project, 'projectId' | 'createdAt' | 'updatedAt' | 'publishedAt' | 'closedAt'> {
   const now = new Date()
   
@@ -178,8 +179,9 @@ export function convertFormDataToProject(
     
     status: formData.isDraft ? 'draft' : 'active',
     visibility: formData.visibility,
-    proposalCount: 0,
-    hiredFreelancerId: '',
+    // Preserve existing values for these fields if available, otherwise use sensible defaults
+    proposalCount: existingProject?.proposalCount ?? 0,
+    hiredFreelancerId: existingProject?.hiredFreelancerId ?? '',
     
     milestones: formData.milestones
       .filter(milestone => milestone.title.trim() !== '' || milestone.description.trim() !== '') // Only include milestones with content
