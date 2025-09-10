@@ -356,9 +356,9 @@ const AuthenticatedNav = ({ user, logout }: { user: any, logout: () => void }) =
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="flex items-center space-x-2">
-                  {user?.photoURL ? (
+                  {(user?.photoURL || user?.about?.profileUrl) ? (
                     <Image
-                      src={user.photoURL}
+                      src={user?.photoURL || user?.about?.profileUrl}
                       alt={user?.displayName || 'User'}
                       width={32}
                       height={32}
