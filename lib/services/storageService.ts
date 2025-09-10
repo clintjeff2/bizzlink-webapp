@@ -21,6 +21,9 @@ export interface FileUploadResult {
 /**
  * Upload a profile image to Firebase Storage
  * Creates multiple sizes: original, medium (400x400), thumbnail (150x150)
+ * 
+ * Note: After uploading the image, be sure to call updateUserProfileImage from the Redux API
+ * to update both photoURL and about.profileUrl fields in the user document.
  */
 export async function uploadProfileImage(
   userId: string, 
