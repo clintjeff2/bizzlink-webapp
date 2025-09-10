@@ -1564,6 +1564,75 @@ export default function ProfilePage() {
                                   placeholder="https://..."
                                 />
                               </div>
+                              
+                              {/* Project Skills */}
+                              <div>
+                                <Label htmlFor={`proj-skills-${project.id}`}>Skills Used</Label>
+                                <div className="flex flex-wrap gap-2 mt-2 mb-3">
+                                  {(project.skills || []).map((skill: any, idx: number) => (
+                                    <Badge 
+                                      key={`${project.id}-skill-${idx}`} 
+                                      className="px-2 py-1 bg-blue-50 text-blue-700 flex items-center gap-1"
+                                    >
+                                      {typeof skill === 'string' ? skill : skill.text}
+                                      <button
+                                        onClick={() => {
+                                          const updatedPortfolio = [...(formData.portfolio || [])]
+                                          const projIndex = updatedPortfolio.findIndex(p => p.id === project.id)
+                                          if (projIndex !== -1) {
+                                            const updatedSkills = updatedPortfolio[projIndex].skills.filter(
+                                              (s: any, i: number) => i !== idx
+                                            )
+                                            updatedPortfolio[projIndex] = { 
+                                              ...updatedPortfolio[projIndex], 
+                                              skills: updatedSkills
+                                            }
+                                            setFormData(prev => ({ ...prev, portfolio: updatedPortfolio }))
+                                          }
+                                        }}
+                                        className="ml-1 text-blue-700 hover:text-red-600"
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </button>
+                                    </Badge>
+                                  ))}
+                                </div>
+                                
+                                {/* Add skills to project */}
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                                  {skillsList
+                                    .filter((skillText) => !project.skills?.some((s: any) => 
+                                      (typeof s === 'string' ? s : s.text) === skillText
+                                    ))
+                                    .slice(0, 9)
+                                    .map((skillText) => (
+                                      <Button
+                                        key={`${project.id}-add-${skillText}`}
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                          const updatedPortfolio = [...(formData.portfolio || [])]
+                                          const projIndex = updatedPortfolio.findIndex(p => p.id === project.id)
+                                          if (projIndex !== -1) {
+                                            const newSkill = {
+                                              id: Date.now().toString(),
+                                              text: skillText
+                                            }
+                                            const currentSkills = updatedPortfolio[projIndex].skills || []
+                                            updatedPortfolio[projIndex] = {
+                                              ...updatedPortfolio[projIndex],
+                                              skills: [...currentSkills, newSkill]
+                                            }
+                                            setFormData(prev => ({ ...prev, portfolio: updatedPortfolio }))
+                                          }
+                                        }}
+                                        className="justify-start text-xs"
+                                      >
+                                        + {skillText}
+                                      </Button>
+                                    ))}
+                                </div>
+                              </div>
                             </div>
                           </div>
                         ) : (
@@ -1693,12 +1762,47 @@ export default function ProfilePage() {
         {showImageUpload && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-              <h3 className="text-lg font-semibold mb-4">Upload Profile Photo</h3>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold">Upload Profile Photo</h3>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setShowImageUpload(false)}
+                  className="h-8 w-8 p-0 rounded-full"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              
+              {displayData.photoURL && (
+                <div className="mb-4">
+                  <div className="flex items-center justify-center mb-3 relative">
+                    <Avatar className="w-24 h-24 border border-gray-200">
+                      <AvatarImage src={displayData.photoURL} className="object-cover" />
+                      <AvatarFallback className="bg-blue-100 text-primary-blue">
+                        {displayData.firstname?.[0]}{displayData.lastname?.[0]}
+                      </AvatarFallback>
+                    </Avatar>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => {
+                      handleInputChange("photoURL", "")
+                    }}
+                    className="w-full flex items-center justify-center text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Remove Current Photo
+                  </Button>
+                </div>
+              )}
+              
               <ImageUpload
                 value={displayData.photoURL || ''}
                 onChange={(url: string) => {
+                  // Only close the modal when a new image is successfully uploaded
                   handleInputChange("photoURL", url)
-                  setShowImageUpload(false)
+                  // Don't close the modal automatically, let the user close it
                 }}
                 onError={(error) => {
                   toast({
@@ -1711,6 +1815,9 @@ export default function ProfilePage() {
               <div className="flex justify-end space-x-3 mt-4">
                 <Button variant="outline" onClick={() => setShowImageUpload(false)}>
                   Cancel
+                </Button>
+                <Button onClick={() => setShowImageUpload(false)}>
+                  Done
                 </Button>
               </div>
             </div>
