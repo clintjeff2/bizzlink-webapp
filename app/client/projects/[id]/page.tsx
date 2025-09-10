@@ -538,6 +538,32 @@ export default function ClientProjectDetailPage() {
                 </Card>
               </TabsContent>
 
+              {/* Proposals Tab */}
+              <TabsContent value="proposals" className="space-y-6">
+                <Card className="shadow-lg border-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle>Project Proposals</CardTitle>
+                      <div className="text-sm text-gray-600 dark:text-gray-300">
+                        {projectDetails.proposalCount} proposals received
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <p className="text-gray-600 dark:text-gray-300">
+                        View all proposals submitted for this project
+                      </p>
+                      <Link href={`/client/projects/${params.id}/proposals`}>
+                        <Button>
+                          View All Proposals
+                        </Button>
+                      </Link>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
               {/* Milestones Tab */}
               <TabsContent value="milestones" className="space-y-6">
                 <Card className="shadow-lg border-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
