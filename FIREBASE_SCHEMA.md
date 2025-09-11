@@ -455,51 +455,251 @@ interface Contract {
 
 ### 5. Conversations Collection (`conversations/{conversationId}`)
 
-**Purpose**: Manages message threads between users.
+**Purpose**: Manages message threads between users with support for various communication contexts.
 
 ```typescript
 interface Conversation {
   conversationId: string;
-  participants: string[];           // Array of user IDs
-  type: "project_inquiry" | "contract_discussion" | "general";
-  projectId?: string;               // Optional, if related to project
-  contractId?: string;              // Optional, if related to contract
+  
+  // Participant Structure
+  clientId?: string;                 // For one-to-one conversations
+  freelancerId?: string;             // For one-to-one conversations
+  adminId?: string;                  // For announcements/support
+  audienceType?: "all" | "clients" | "freelancers"; // For announcements
+  participants: string[];            // All participant IDs (kept for query efficiency)
+  
+  // Basic Info
+  type: "one_to_one" | "announcement" | "support";
+  
+  // Context Links
+  projectId?: string;               
+  contractId?: string;              
+  proposalId?: string;
+  
+  // Message Status
   lastMessage: {
     text: string;
+    preview: string;
     senderId: string;
     timestamp: Timestamp;
+    type: "text" | "file" | "image" | "audio" | "video" | "system";
   };
   unreadCount: Record<string, number>; // userId -> unread count
-  isArchived: boolean;
+  
+  // Administrative
+  pinned: boolean;
+  isArchived: Record<string, boolean>; // Per user archive status
+  isMuted: Record<string, boolean>;    // Per user notification settings
+  
+  // Metadata
+  createdBy: string;                   // User ID of creator
   createdAt: Timestamp;
   updatedAt: Timestamp;
+
+  // Call History (for future audio/video features)
+  callHistory?: Array<{
+    callId: string;
+    initiator: string;
+    type: "audio" | "video";
+    participants: string[];
+    startTime: Timestamp;
+    endTime: Timestamp;
+    duration: number;                // in seconds
+    status: "completed" | "missed" | "rejected" | "failed";
+  }>;
+  
+  // Analytics & Metrics
+  metrics?: {
+    messageCount: number;
+    mediaCount: number;
+    participantCount: number;
+    responseTime: number;           // Average response time in minutes
+    activityScore: number;          // For ranking conversations by activity
+  };
 }
 ```
 
 ### 6. Messages Subcollection (`conversations/{conversationId}/messages/{messageId}`)
 
-**Purpose**: Stores individual messages within conversations.
+**Purpose**: Stores individual messages with advanced media support and tracking.
 
 ```typescript
 interface Message {
   messageId: string;
+  conversationId: string;           // Reference to parent conversation
+  
+  // Sender information
   senderId: string;
+  senderType: "client" | "freelancer" | "admin";
+  
+  // Message Content
   text: string;
-  type: "text" | "file" | "image" | "system";
+  richText?: {                      // Optional formatted text
+    html: string;                   // HTML content for rich formatting
+    mentions: string[];             // User IDs mentioned in the message
+    links: string[];                // URLs contained in the message
+  };
+  translation?: Record<string, string>; // Language code -> translated text
+  
+  // Message Type & Classification
+  type: "text" | "file" | "image" | "audio" | "video" | "location" | "contact" | "system" | "call_log";
+  subtype?: string;                 // E.g., "milestone_update", "payment_reminder", etc.
+  isImportant: boolean;             // Flagged as important
+  
+  // Media & Attachments
   attachments: Array<{
+    attachmentId: string;
     fileName: string;
     fileUrl: string;
     fileType: string;
     fileSize: number;
+    thumbnailUrl?: string;          // For images and videos
+    duration?: number;              // For audio/video in seconds
+    dimensions?: {                  // For images and videos
+      width: number;
+      height: number;
+    };
+    metadata?: Record<string, any>; // Additional file metadata
   }>;
-  isRead: boolean;
-  readAt: Timestamp;
-  editedAt: Timestamp;
-  timestamp: Timestamp;
+  
+  // Voice Messages
+  audioMessage?: {
+    duration: number;               // In seconds
+    waveformData: number[];         // For visual representation
+    transcription?: string;         // Speech-to-text content
+  };
+  
+  // Location Sharing
+  location?: {
+    latitude: number;
+    longitude: number;
+    address: string;
+    name: string;                   // Place name
+  };
+  
+  // Message Tracking & Status
+  readBy: Record<string, Timestamp>; // User ID -> read timestamp
+  deliveredTo: Record<string, Timestamp>; // User ID -> delivery timestamp
+  reactions: Record<string, Array<{
+    userId: string;
+    reaction: string;              // Emoji or reaction type
+    timestamp: Timestamp;
+  }>>;
+  
+  // Message Lifecycle
+  status: "sending" | "sent" | "delivered" | "read" | "failed";
+  isEdited: boolean;
+  isDeleted: boolean;               // Soft delete flag
+  isForwarded: boolean;
+  originalMessageId?: string;       // If forwarded from another message
+  
+  // Reply Threading
+  isReply: boolean;
+  replyToMessageId?: string;        // If replying to a specific message
+  replyToSenderId?: string;         // User ID of the original message sender
+  replyPreview?: string;            // Preview of the replied message
+  threadParticipants?: string[];    // For thread-specific participants
+  
+  // Action Buttons & Interactive Elements
+  actions?: Array<{
+    actionId: string;
+    actionType: "button" | "link" | "form";
+    label: string;
+    value: string;                  // Data payload for the action
+    url?: string;                   // For links
+    style?: string;                 // UI styling hint
+    confirmedBy?: string[];         // User IDs who performed this action
+  }>;
+  
+  // Timekeeping
+  expiresAt?: Timestamp;           // For disappearing messages
+  scheduledFor?: Timestamp;         // For scheduled messages
+  editWindow?: number;              // Time in seconds during which editing is allowed
+  timestamp: Timestamp;             // When the message was sent
+  editedAt?: Timestamp;
+  deletedAt?: Timestamp;
 }
 ```
 
-### 7. Reviews Collection (`reviews/{reviewId}`)
+### 7. Presence Collection (`presence/{userId}`)
+
+**Purpose**: Tracks user online status and availability for real-time communications.
+
+```typescript
+interface Presence {
+  userId: string;
+  status: "online" | "away" | "busy" | "offline";
+  lastActive: Timestamp;
+  device: {
+    type: "mobile" | "desktop" | "tablet";
+    platform: string;              // e.g., "iOS", "Android", "Web"
+    appVersion: string;
+    pushToken?: string;            // For push notifications
+  };
+  settings: {
+    showStatus: boolean;           // Whether to display online status
+    allowCalls: boolean;           // Whether to allow incoming calls
+    availableForProjects: boolean; // Available for new work (freelancers)
+  };
+  location?: {                     // Optional location sharing
+    country: string;
+    timezone: string;
+    lastUpdated: Timestamp;
+  };
+  activeConversations: string[];   // List of conversation IDs where user is active
+  typingIn?: {                     // Typing indicators
+    conversationId: string;
+    timestamp: Timestamp;
+  };
+  updatedAt: Timestamp;
+}
+```
+
+### 8. Calls Collection (`calls/{callId}`)
+
+**Purpose**: Manages audio and video call information for the platform.
+
+```typescript
+interface Call {
+  callId: string;
+  conversationId: string;
+  type: "audio" | "video" | "screen_share";
+  initiator: string;               // User ID who started the call
+  participants: string[];          // All invited participants
+  activeParticipants: Record<string, {
+    joinedAt: Timestamp;
+    leftAt?: Timestamp;
+    deviceInfo: string;
+    connectionQuality: "excellent" | "good" | "poor" | "bad";
+    hasVideo: boolean;
+    hasAudio: boolean;
+    isScreenSharing: boolean;
+  }>;
+  status: "ringing" | "ongoing" | "completed" | "missed" | "declined" | "failed";
+  startedAt: Timestamp;
+  endedAt?: Timestamp;
+  duration?: number;                // In seconds
+  recordingUrl?: string;            // If call recording is enabled and available
+  quality: {
+    averageRating: number;          // 1-5 rating of call quality
+    issues: string[];               // Array of reported issues
+    connectionEvents: Array<{
+      type: "interruption" | "reconnect" | "quality_change";
+      timestamp: Timestamp;
+      data: any;                    // Additional data about the event
+    }>;
+  };
+  metadata: {                       // Context information for the call
+    projectId?: string;
+    contractId?: string;
+    purpose?: string;
+  };
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+```
+
+### 9. Reviews Collection (`reviews/{reviewId}`)
 
 **Purpose**: Stores ratings and feedback between clients and freelancers.
 
