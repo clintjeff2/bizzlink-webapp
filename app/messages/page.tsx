@@ -1,306 +1,244 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
+import { Card } from "@/components/ui/card"
+import { Spinner } from "@/components/ui/spinner"
 import { Navigation } from "@/components/navigation"
-import { Search, Send, Paperclip, MoreVertical, Phone, Video, CheckCheck } from "lucide-react"
-import Image from "next/image"
-
-const conversations = [
-  {
-    id: 1,
-    name: "Sarah Chen",
-    avatar: "/professional-woman-developer.png",
-    lastMessage: "I've completed the homepage design. Please review and let me know your feedback.",
-    time: "10 min ago",
-    unread: 2,
-    online: true,
-    project: "E-commerce Website Development",
-    role: "freelancer",
-  },
-  {
-    id: 2,
-    name: "Marcus Johnson",
-    avatar: "/professional-man-designer.png",
-    lastMessage: "The wireframes are ready for your review. I've incorporated all your feedback.",
-    time: "2 hours ago",
-    unread: 0,
-    online: false,
-    project: "Mobile App UI/UX Design",
-    role: "freelancer",
-  },
-  {
-    id: 3,
-    name: "Elena Rodriguez",
-    avatar: "/professional-woman-marketer.png",
-    lastMessage: "Thank you for choosing me for your SEO project. When can we schedule a kickoff call?",
-    time: "1 day ago",
-    unread: 1,
-    online: true,
-    project: "SEO Optimization Campaign",
-    role: "freelancer",
-  },
-  {
-    id: 4,
-    name: "TechStart Inc.",
-    avatar: "/business-client.png",
-    lastMessage: "Great work on the API integration. The payment system is working perfectly now.",
-    time: "2 days ago",
-    unread: 0,
-    online: false,
-    project: "Backend Development",
-    role: "client",
-  },
-]
-
-const messages = [
-  {
-    id: 1,
-    sender: "Sarah Chen",
-    content:
-      "Hi! I've completed the homepage design for your e-commerce website. I've focused on creating a clean, modern layout that highlights your products effectively.",
-    time: "2:30 PM",
-    isOwn: false,
-    avatar: "/professional-woman-developer.png",
-  },
-  {
-    id: 2,
-    sender: "Sarah Chen",
-    content:
-      "I've also implemented the responsive design so it looks great on all devices. Would you like to schedule a call to review it together?",
-    time: "2:32 PM",
-    isOwn: false,
-    avatar: "/professional-woman-developer.png",
-  },
-  {
-    id: 3,
-    sender: "You",
-    content:
-      "This looks fantastic! I love the clean design and the way you've organized the product categories. The mobile version is perfect too.",
-    time: "2:45 PM",
-    isOwn: true,
-    avatar: "/placeholder.svg?height=32&width=32",
-  },
-  {
-    id: 4,
-    sender: "You",
-    content:
-      "Let's schedule a call for tomorrow at 3 PM to discuss the next phase. Can you also show me how the shopping cart functionality will work?",
-    time: "2:46 PM",
-    isOwn: true,
-    avatar: "/placeholder.svg?height=32&width=32",
-  },
-  {
-    id: 5,
-    sender: "Sarah Chen",
-    content:
-      "Perfect! I'll send you a calendar invite for tomorrow at 3 PM. I'll prepare a demo of the shopping cart functionality and show you the checkout process flow.",
-    time: "3:15 PM",
-    isOwn: false,
-    avatar: "/professional-woman-developer.png",
-  },
-]
+import { ConversationList } from "@/components/messages-components/conversation-list"
+import { ChatHeader } from "@/components/messages-components/chat-header"
+import { MessageList } from "@/components/messages-components/message-list"
+import { MessageInput } from "@/components/messages-components/message-input"
+import { MessagesWelcome } from "@/components/messages-components/messages-welcome"
+import { CornerUpRight } from "lucide-react"
+import { useMessages } from "@/lib/hooks/useMessages"
+import { formatMessageTime, formatLastActive } from "@/lib/utils/messageUtils"
 
 export default function MessagesPage() {
-  const [selectedConversation, setSelectedConversation] = useState(conversations[0])
-  const [newMessage, setNewMessage] = useState("")
-  const [searchQuery, setSearchQuery] = useState("")
+  // Use our custom messages hook
+  const { 
+    conversations,
+    allConversations,
+    messages,
+    selectedConversation,
+    selectConversation,
+    sendMessage,
+    updateTyping,
+    loading,
+    error,
+    uploadStatus,
+    activeTab,
+    setActiveTab,
+    isUserOnline,
+    getUnreadCount,
+    showConversations,
+    showMessages,
+    showWelcomeScreen,
+    handleBackToConversations,
+    isMobileView,
+    presences,
+    currentUserId
+  } = useMessages()
+  
+  // Error handling state
+  const [localError, setLocalError] = useState<string | null>(null)
 
-  const filteredConversations = conversations.filter(
-    (conv) =>
-      conv.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      conv.project.toLowerCase().includes(searchQuery.toLowerCase()),
-  )
-
-  const sendMessage = () => {
-    if (newMessage.trim()) {
-      // Add message logic here
-      setNewMessage("")
+  // Helper function to extract progress percentage from upload status
+  const extractProgressFromStatus = (status: string): number => {
+    const match = status.match(/(\d+)%/);
+    return match ? parseInt(match[1], 10) : 0;
+  }
+  
+  // Handle sending a new message
+  const handleSendMessage = async (text: string, attachments: File[]) => {
+    try {
+      // Reset any local error
+      setLocalError(null)
+      
+      // Call the hook's sendMessage function
+      await sendMessage(text, attachments)
+    } catch (err) {
+      console.error('Error sending message:', err)
+      setLocalError('Failed to send message. Please try again.')
+      
+      // Clear error after 3 seconds
+      setTimeout(() => setLocalError(null), 3000)
     }
+  }
+  
+  // Handle typing state
+  const handleTyping = (isTyping: boolean) => {
+    try {
+      updateTyping(isTyping)
+    } catch (err) {
+      console.error('Error updating typing status:', err)
+      // Don't show error for typing issues as they're non-critical
+    }
+  }
+  
+  // Clear error on component mount/unmount
+  useEffect(() => {
+    return () => {
+      setLocalError(null)
+    }
+  }, [])
+
+  // Get users who are typing in the current conversation
+  const getTypingUsers = () => {
+    if (!selectedConversation || !presences) return [];
+    
+    const typingUsers = [];
+    
+    for (const userId in presences) {
+      const presence = presences[userId];
+      
+      try {
+        // Check if user is typing in this conversation
+        if (
+          presence?.typingIn?.conversationId === selectedConversation?.conversationId &&
+          // Ensure it's not the current user
+          userId !== selectedConversation?.createdBy
+        ) {
+          // Find user info from the conversation
+          let userName = 'User';
+          let avatar = '/placeholder-user.jpg';
+          
+          if (userId === selectedConversation?.clientId) {
+            userName = selectedConversation?.name || 'Client';
+            avatar = selectedConversation?.avatar || '/placeholder-user.jpg';
+          } else if (userId === selectedConversation?.freelancerId) {
+            userName = selectedConversation?.name || 'Freelancer';
+            avatar = selectedConversation?.avatar || '/placeholder-user.jpg';
+          }
+          
+          typingUsers.push({
+            userId,
+            name: userName,
+            avatar
+          });
+        }
+      } catch (err) {
+        console.error('Error processing typing user:', err);
+        // Continue to the next user on error
+      }
+    }
+    
+    return typingUsers;
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="h-screen bg-gray-50 overflow-hidden">
       <Navigation />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Messages</h1>
-          <p className="text-gray-600">Communicate with your freelancers and clients</p>
+      {loading ? (
+        <div className="flex items-center justify-center h-[calc(100vh-64px)]">
+          <Spinner size="lg" />
         </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-200px)]">
-          {/* Conversations List */}
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-0 h-full flex flex-col">
-              {/* Search */}
-              <div className="p-4 border-b border-gray-200">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                  <Input
-                    placeholder="Search conversations..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 border-gray-200 focus:border-blue-500 focus:ring-0"
-                  />
-                </div>
-              </div>
-
-              {/* Conversations */}
-              <div className="flex-1 overflow-y-auto">
-                {filteredConversations.map((conversation) => (
-                  <div
-                    key={conversation.id}
-                    onClick={() => setSelectedConversation(conversation)}
-                    className={`p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors ${
-                      selectedConversation.id === conversation.id ? "bg-blue-50 border-blue-200" : ""
-                    }`}
-                  >
-                    <div className="flex items-start space-x-3">
-                      <div className="relative">
-                        <Image
-                          src={conversation.avatar || "/placeholder.svg"}
-                          alt={conversation.name}
-                          width={40}
-                          height={40}
-                          className="w-10 h-10 rounded-full object-cover"
-                        />
-                        {conversation.online && (
-                          <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-1">
-                          <h3 className="text-sm font-semibold text-gray-900 truncate">{conversation.name}</h3>
-                          <div className="flex items-center space-x-2">
-                            <span className="text-xs text-gray-500">{conversation.time}</span>
-                            {conversation.unread > 0 && (
-                              <Badge className="bg-blue-500 hover:bg-blue-500 text-white text-xs px-2 py-0.5">
-                                {conversation.unread}
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                        <p className="text-xs text-gray-600 mb-1 truncate">{conversation.project}</p>
-                        <p className="text-sm text-gray-700 line-clamp-2">{conversation.lastMessage}</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Chat Area */}
-          <div className="lg:col-span-2">
-            <Card className="border-0 shadow-lg h-full">
-              <CardContent className="p-0 h-full flex flex-col">
-                {/* Chat Header */}
-                <div className="p-4 border-b border-gray-200 bg-white rounded-t-lg">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className="relative">
-                        <Image
-                          src={selectedConversation.avatar || "/placeholder.svg"}
-                          alt={selectedConversation.name}
-                          width={40}
-                          height={40}
-                          className="w-10 h-10 rounded-full object-cover"
-                        />
-                        {selectedConversation.online && (
-                          <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
-                        )}
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-gray-900">{selectedConversation.name}</h3>
-                        <div className="flex items-center space-x-2">
-                          <p className="text-sm text-gray-600">{selectedConversation.project}</p>
-                          <Badge variant="outline" className="text-xs">
-                            {selectedConversation.role}
-                          </Badge>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Button variant="ghost" size="sm">
-                        <Phone className="w-4 h-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm">
-                        <Video className="w-4 h-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm">
-                        <MoreVertical className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Messages */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                  {messages.map((message) => (
-                    <div key={message.id} className={`flex ${message.isOwn ? "justify-end" : "justify-start"}`}>
-                      <div
-                        className={`flex items-start space-x-2 max-w-xs lg:max-w-md ${message.isOwn ? "flex-row-reverse space-x-reverse" : ""}`}
-                      >
-                        <Image
-                          src={message.avatar || "/placeholder.svg"}
-                          alt={message.sender}
-                          width={32}
-                          height={32}
-                          className="w-8 h-8 rounded-full object-cover"
-                        />
-                        <div
-                          className={`rounded-2xl px-4 py-2 ${
-                            message.isOwn ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-900"
-                          }`}
-                        >
-                          <p className="text-sm">{message.content}</p>
-                          <div
-                            className={`flex items-center justify-between mt-1 ${
-                              message.isOwn ? "text-blue-100" : "text-gray-500"
-                            }`}
-                          >
-                            <span className="text-xs">{message.time}</span>
-                            {message.isOwn && <CheckCheck className="w-3 h-3 ml-2" />}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Message Input */}
-                <div className="p-4 border-t border-gray-200 bg-white rounded-b-lg">
-                  <div className="flex items-center space-x-2">
-                    <Button variant="ghost" size="sm">
-                      <Paperclip className="w-4 h-4" />
-                    </Button>
-                    <div className="flex-1 relative">
-                      <Input
-                        placeholder="Type your message..."
-                        value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
-                        onKeyPress={(e) => e.key === "Enter" && sendMessage()}
-                        className="pr-12 border-gray-200 focus:border-blue-500 focus:ring-0"
-                      />
-                    </div>
-                    <Button
-                      onClick={sendMessage}
-                      disabled={!newMessage.trim()}
-                      className="bg-blue-600 hover:bg-blue-700 text-white"
-                    >
-                      <Send className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+      ) : error && !localError ? (
+        <div className="flex items-center justify-center h-[calc(100vh-64px)] text-center p-4">
+          <div>
+            <p className="text-red-500 font-medium mb-2">Error loading messages</p>
+            <p className="text-gray-500">{error}</p>
           </div>
         </div>
-      </div>
+      ) : (
+        <div className="max-w-[1600px] mx-auto px-2 sm:px-4 lg:px-6 py-2 xs:py-3 sm:py-4 lg:py-6 h-[calc(100vh-64px)] flex flex-col">
+          <div className="mb-2 sm:mb-3 lg:mb-4 hidden xs:flex justify-between items-center">
+            <div>
+              <p className="text-sm sm:text-base text-gray-600">Communicate with your freelancers and clients</p>
+            </div>
+            {showMessages && isMobileView() && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={handleBackToConversations}
+                className="lg:hidden"
+              >
+                <CornerUpRight className="w-4 h-4 mr-1" /> Back
+              </Button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-2 xs:gap-3 sm:gap-4 lg:gap-6 flex-1 overflow-hidden">
+            {/* Conversations List */}
+            <ConversationList 
+              conversations={conversations}
+              allConversations={allConversations}
+              selectedConversation={selectedConversation}
+              setSelectedConversation={selectConversation}
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
+              isUserOnline={isUserOnline}
+              getUnreadCount={getUnreadCount}
+              formatMessageTime={formatMessageTime}
+              showConversations={showConversations}
+              isMobileView={isMobileView}
+              presences={presences}
+              currentUserId={currentUserId}
+            />
+
+            {/* Chat Area */}
+            <div 
+              className={`lg:col-span-8 h-full overflow-hidden ${
+                (showMessages || !isMobileView()) ? 'block' : 'hidden lg:block'
+              }`}
+            >
+              <Card className="border-0 shadow-lg h-full flex flex-col">
+                {showWelcomeScreen ? (
+                  <MessagesWelcome />
+                ) : (
+                  <div className="flex flex-col h-full overflow-hidden">
+                    {/* Chat Header - Always render the header, it will handle null case internally */}
+                    <ChatHeader 
+                      selectedConversation={selectedConversation}
+                      isUserOnline={isUserOnline}
+                      formatLastActive={formatLastActive}
+                      handleBackToConversations={handleBackToConversations}
+                      isMobileView={isMobileView}
+                    />
+                    
+                    {/* Message List - This component should scroll independently */}
+                    <div className="flex-1 overflow-hidden">
+                      <MessageList 
+                        messages={messages} // messages already contains the selected conversation's messages
+                        selectedConversation={selectedConversation}
+                        typingUsers={selectedConversation ? getTypingUsers() : []}
+                      />
+                    </div>
+                    
+                    {/* Message Input - Fixed at the bottom, only show if conversation selected */}
+                    {selectedConversation && (
+                      <div className="flex-shrink-0">
+                        {/* Upload Status Display */}
+                        {uploadStatus && (
+                          <div className="px-4 py-2 bg-blue-50 border-l-4 border-blue-400 mx-4 mb-2 rounded">
+                            <p className="text-sm text-blue-700">{uploadStatus}</p>
+                          </div>
+                        )}
+                        
+                        {/* Upload Error Display */}
+                        {localError && (
+                          <div className="px-4 py-2 bg-red-50 border-l-4 border-red-400 mx-4 mb-2 rounded">
+                            <p className="text-sm text-red-700">{localError}</p>
+                          </div>
+                        )}
+                        
+                        <MessageInput 
+                          onSendMessage={handleSendMessage}
+                          onTyping={handleTyping}
+                          isUploading={!!uploadStatus}
+                          uploadProgress={uploadStatus ? extractProgressFromStatus(uploadStatus) : 0}
+                          uploadError={null}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+              </Card>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
