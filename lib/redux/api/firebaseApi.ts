@@ -86,12 +86,45 @@ import type {
 
 // Helper function to convert Firestore timestamps to serializable strings
 const serializeUser = (user: any): User => {
-  return {
-    ...user,
-    createdAt: user.createdAt instanceof Timestamp ? user.createdAt.toDate().toISOString() : user.createdAt,
-    updatedAt: user.updatedAt instanceof Timestamp ? user.updatedAt.toDate().toISOString() : user.updatedAt,
-    lastLoginAt: user.lastLoginAt instanceof Timestamp ? user.lastLoginAt.toDate().toISOString() : user.lastLoginAt,
-  }
+  // Create a copy of the user object to avoid mutation
+  const serializedUser = { ...user };
+  
+  // Process all Timestamp fields recursively to make them serializable
+  const processObject = (obj: any): any => {
+    if (!obj || typeof obj !== 'object') return obj;
+    
+    // Handle arrays
+    if (Array.isArray(obj)) {
+      return obj.map(item => processObject(item));
+    }
+    
+    // Handle objects
+    const result: any = {};
+    for (const key in obj) {
+      const value = obj[key];
+      
+      // Check if it's a Timestamp
+      if (value instanceof Timestamp) {
+        result[key] = value.toDate().toISOString();
+      } 
+      // Check if it's a Date
+      else if (value instanceof Date) {
+        result[key] = value.toISOString();
+      }
+      // Process nested objects/arrays
+      else if (value && typeof value === 'object') {
+        result[key] = processObject(value);
+      } 
+      // Pass through other values
+      else {
+        result[key] = value;
+      }
+    }
+    return result;
+  };
+  
+  // Return the serialized user object
+  return processObject(serializedUser) as User;
 }
 
 // Helper function to convert Firestore timestamps in projects to serializable strings
