@@ -221,10 +221,10 @@ export default function ClientProjectProposalsPage() {
   }
   
   // Handle viewing or creating contract for accepted proposal
-  const handleViewContract = (proposalId: string) => {
+  const handleViewContract = (proposalId: string, freelancerId: string) => {
     // Direct the user to the contract creation page with the proposalId
     // The contract page will handle checking if a contract exists and redirecting appropriately
-    router.push(`/client/contracts/create?proposalId=${proposalId}`);
+    router.push(`/client/contracts/create?proposalId=${proposalId}&freelancerId=${freelancerId}`);
   }
   
   // Handle declining a proposal
@@ -510,7 +510,7 @@ export default function ClientProjectProposalsPage() {
       
       // Navigate to the contract creation page after a short delay to show the toast
       setTimeout(() => {
-        router.push(`/client/contracts/create?proposalId=${selectedProposalId}`)
+        router.push(`/client/contracts/create?proposalId=${selectedProposalId}&freelancerId=${proposal.freelancerId}`)
       }, 1500)
     } catch (err) {
       console.error('Error hiring freelancer:', err)
@@ -960,7 +960,7 @@ export default function ClientProjectProposalsPage() {
                             <Button 
                               size="sm"
                               className="bg-green-600 hover:bg-green-700"
-                              onClick={() => handleViewContract(proposal.proposalId)}
+                              onClick={() => handleViewContract(proposal.proposalId, proposal.freelancerId)}
                             >
                               <FileText className="w-3.5 h-3.5 mr-2" />
                               Contract
