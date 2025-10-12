@@ -247,7 +247,7 @@ export default function ClientProposalDetailPage({ params }: { params: { id: str
         
         // Navigate to contract setup page after a short delay to show the toast
         setTimeout(() => {
-          router.push(`/client/contracts/create?proposalId=${proposalId}`);
+          router.push(`/client/contracts/create?proposalId=${proposalId}&freelancerId=${proposal.freelancerId}`);
         }, 1500);
       } catch (error) {
         console.error('Error updating proposal status:', error);
