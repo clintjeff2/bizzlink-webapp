@@ -256,6 +256,7 @@ const AuthenticatedNav = ({ user, logout }: { user: any, logout: () => void }) =
           { href: "/projects/post", label: "Post Project", icon: Briefcase },
           { href: "/client/projects", label: "My Projects", icon: Briefcase },
           { href: "/freelancers", label: "Find Talent", icon: Users },
+          { href: "/client/contracts", label: "Contracts", icon: DollarSign },
         ]
       case "freelancer":
         return [
