@@ -1,22 +1,50 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Navigation } from "@/components/navigation"
-import { ConfirmModal } from "@/components/modals/confirm-modal"
-import { Search, Calendar, Clock, User, FileText, CheckCircle, XCircle, Eye, MessageSquare, Send, AlertCircle, Star, MapPin } from "lucide-react"
-import Image from "next/image"
-import Link from "next/link"
-import { auth } from "@/firebase"
-import { useAuthState } from "react-firebase-hooks/auth"
-import { useAppDispatch, useAppSelector } from "@/lib/redux/hooks"
-import { Proposal, subscribeToFreelancerProposals, withdrawProposal, selectAllProposals, selectProposalLoading, selectProposalError, selectProposalStats } from "@/lib/redux"
-import { Timestamp } from "firebase/firestore"
-import { useToast } from "@/hooks/use-toast"
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Navigation } from "@/components/navigation";
+import { ConfirmModal } from "@/components/modals/confirm-modal";
+import {
+  Search,
+  Calendar,
+  Clock,
+  User,
+  FileText,
+  CheckCircle,
+  XCircle,
+  Eye,
+  MessageSquare,
+  Send,
+  AlertCircle,
+  Star,
+  MapPin,
+} from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
+import { auth } from "@/firebase";
+import { useAuthState } from "react-firebase-hooks/auth";
+import { useAppDispatch, useAppSelector } from "@/lib/redux/hooks";
+import {
+  Proposal,
+  subscribeToFreelancerProposals,
+  withdrawProposal,
+  selectAllProposals,
+  selectProposalLoading,
+  selectProposalError,
+  selectProposalStats,
+} from "@/lib/redux";
+import { Timestamp } from "firebase/firestore";
+import { useToast } from "@/hooks/use-toast";
 
 // Fallback proposals for when loading or if an error occurs
 const fallbackProposals = [
@@ -99,7 +127,8 @@ const fallbackProposals = [
     experienceLevel: "Expert",
     proposalsCount: 15,
     lastActivity: "Proposal declined",
-    rejectionReason: "Client chose a different freelancer with more e-learning experience",
+    rejectionReason:
+      "Client chose a different freelancer with more e-learning experience",
   },
   {
     id: "PROP-004",
@@ -119,7 +148,12 @@ const fallbackProposals = [
       "I specialize in creating memorable brand identities for startups. My design process focuses on understanding your target audience and creating a visual identity that resonates with your brand values...",
     projectDescription:
       "Create a complete brand identity package including logo design, color palette, typography, business cards, and brand guidelines for a tech startup.",
-    skills: ["Logo Design", "Brand Identity", "Adobe Creative Suite", "Brand Strategy"],
+    skills: [
+      "Logo Design",
+      "Brand Identity",
+      "Adobe Creative Suite",
+      "Brand Strategy",
+    ],
     clientBudget: "$2,000 - $3,500",
     projectType: "Fixed Price",
     duration: "Less than 1 month",
@@ -153,17 +187,17 @@ const fallbackProposals = [
     proposalsCount: 9,
     lastActivity: "1 day ago",
   },
-]
+];
 
 export default function FreelancerProposalsPage() {
-  const [user, loading, authError] = useAuthState(auth)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [statusFilter, setStatusFilter] = useState("all")
-  const [sortBy, setSortBy] = useState("newest")
-  const [proposals, setProposals] = useState<Proposal[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const { toast } = useToast()
+  const [user, loading, authError] = useAuthState(auth);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("newest");
+  const [proposals, setProposals] = useState<Proposal[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const dispatch = useAppDispatch();
   const reduxProposals = useAppSelector(selectAllProposals);
@@ -173,18 +207,18 @@ export default function FreelancerProposalsPage() {
   // Fetch proposals when the user is authenticated
   useEffect(() => {
     let unsubscribe: () => void;
-    
+
     const fetchProposals = () => {
       if (!user) return;
-      
+
       try {
         setIsLoading(true);
         // Subscribe to real-time updates for the freelancer's proposals using Redux
         unsubscribe = dispatch(subscribeToFreelancerProposals(user.uid));
         setIsLoading(false);
       } catch (err) {
-        console.error('Error fetching proposals:', err);
-        setError('Failed to load proposals. Please try again.');
+        console.error("Error fetching proposals:", err);
+        setError("Failed to load proposals. Please try again.");
         setIsLoading(false);
         toast({
           title: "Error",
@@ -217,42 +251,42 @@ export default function FreelancerProposalsPage() {
   }, [reduxProposals, reduxError]);
 
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
-  const [proposalToWithdraw, setProposalToWithdraw] = useState<string | null>(null);
+  const [proposalToWithdraw, setProposalToWithdraw] = useState<string | null>(
+    null
+  );
 
   // Handle proposal withdrawal
   const openWithdrawModal = (proposalId: string) => {
     setProposalToWithdraw(proposalId);
     setIsWithdrawModalOpen(true);
   };
-  
+
   const handleWithdrawProposal = async () => {
     if (!proposalToWithdraw) return;
-    
+
     try {
       // Optimistically update the UI
-      const optimisticProposals = proposals.map(p => 
-        p.proposalId === proposalToWithdraw 
-          ? { ...p, status: 'withdrawn' } 
-          : p
+      const optimisticProposals = proposals.map((p) =>
+        p.proposalId === proposalToWithdraw ? { ...p, status: "withdrawn" } : p
       );
       setProposals(optimisticProposals);
-      
+
       // Dispatch the action to update in Firebase
       await dispatch(withdrawProposal(proposalToWithdraw));
-      
+
       toast({
         title: "Proposal withdrawn",
         description: "Your proposal has been successfully withdrawn.",
       });
-      
+
       // The Redux store will update automatically via the subscription
       setProposalToWithdraw(null);
     } catch (err) {
-      console.error('Error withdrawing proposal:', err);
-      
+      console.error("Error withdrawing proposal:", err);
+
       // Revert to original data on error
       setProposals(reduxProposals);
-      
+
       toast({
         title: "Error",
         description: "Failed to withdraw proposal. Please try again.",
@@ -282,20 +316,31 @@ export default function FreelancerProposalsPage() {
   const filteredProposals = proposals
     .filter((proposal) => {
       const mappedStatus = mapStatusToDisplay(proposal.status);
-      
+
       const matchesSearch =
-        (proposal.projectTitle?.toLowerCase() || "").includes(searchQuery.toLowerCase()) ||
-        (proposal.clientInfo?.name?.toLowerCase() || "").includes(searchQuery.toLowerCase());
-        
-      const matchesStatus = statusFilter === "all" || mappedStatus === statusFilter;
+        (proposal.projectTitle?.toLowerCase() || "").includes(
+          searchQuery.toLowerCase()
+        ) ||
+        (proposal.clientInfo?.name?.toLowerCase() || "").includes(
+          searchQuery.toLowerCase()
+        );
+
+      const matchesStatus =
+        statusFilter === "all" || mappedStatus === statusFilter;
 
       return matchesSearch && matchesStatus;
     })
     .sort((a, b) => {
       if (sortBy === "newest") {
-        return new Date(b.submittedAt || 0).getTime() - new Date(a.submittedAt || 0).getTime();
+        return (
+          new Date(b.submittedAt || 0).getTime() -
+          new Date(a.submittedAt || 0).getTime()
+        );
       } else if (sortBy === "oldest") {
-        return new Date(a.submittedAt || 0).getTime() - new Date(b.submittedAt || 0).getTime();
+        return (
+          new Date(a.submittedAt || 0).getTime() -
+          new Date(b.submittedAt || 0).getTime()
+        );
       } else if (sortBy === "amount_high") {
         return b.bid.amount - a.bid.amount;
       } else if (sortBy === "amount_low") {
@@ -341,13 +386,19 @@ export default function FreelancerProposalsPage() {
   };
 
   // Use statistics from Redux store
-  const { total: totalProposals, submitted: pendingProposals, shortlisted: shortlistedProposals, 
-    accepted: acceptedProposals, rejected: rejectedProposals, withdrawn: withdrawnProposals } = useAppSelector(selectProposalStats);
+  const {
+    total: totalProposals,
+    submitted: pendingProposals,
+    shortlisted: shortlistedProposals,
+    accepted: acceptedProposals,
+    rejected: rejectedProposals,
+    withdrawn: withdrawnProposals,
+  } = useAppSelector(selectProposalStats);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <Navigation />
-      
+
       {/* Withdraw Confirmation Modal */}
       <ConfirmModal
         isOpen={isWithdrawModalOpen}
@@ -363,8 +414,12 @@ export default function FreelancerProposalsPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">My Proposals</h1>
-          <p className="text-gray-600 dark:text-gray-400">Track your project proposals and their status</p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+            My Proposals
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400">
+            Track your project proposals and their status
+          </p>
         </div>
 
         {/* Stats Cards */}
@@ -373,8 +428,12 @@ export default function FreelancerProposalsPage() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Proposals</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{totalProposals}</p>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                    Total Proposals
+                  </p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {totalProposals}
+                  </p>
                 </div>
                 <div className="p-3 bg-blue-100 dark:bg-blue-900 rounded-2xl">
                   <Send className="w-6 h-6 text-blue-600 dark:text-blue-400" />
@@ -387,8 +446,12 @@ export default function FreelancerProposalsPage() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pending</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{pendingProposals}</p>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                    Pending
+                  </p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {pendingProposals}
+                  </p>
                 </div>
                 <div className="p-3 bg-yellow-100 dark:bg-yellow-900 rounded-2xl">
                   <Clock className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
@@ -401,8 +464,12 @@ export default function FreelancerProposalsPage() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Shortlisted</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{shortlistedProposals}</p>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                    Shortlisted
+                  </p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {shortlistedProposals}
+                  </p>
                 </div>
                 <div className="p-3 bg-blue-100 dark:bg-blue-900 rounded-2xl">
                   <Star className="w-6 h-6 text-blue-600 dark:text-blue-400" />
@@ -415,8 +482,12 @@ export default function FreelancerProposalsPage() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Accepted</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{acceptedProposals}</p>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                    Accepted
+                  </p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {acceptedProposals}
+                  </p>
                 </div>
                 <div className="p-3 bg-green-100 dark:bg-green-900 rounded-2xl">
                   <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
@@ -482,30 +553,49 @@ export default function FreelancerProposalsPage() {
             </Card>
           ) : filteredProposals.length > 0 ? (
             filteredProposals.map((proposal) => (
-              <Card key={proposal.proposalId} className="border border-gray-100 dark:border-gray-700 shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden">
+              <Card
+                key={proposal.proposalId}
+                className="border border-gray-100 dark:border-gray-700 shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden"
+              >
                 {/* Status Banner */}
-                <div className={`h-1.5 w-full ${
-                  proposal.status === "accepted" ? "bg-green-500" :
-                  proposal.status === "shortlisted" ? "bg-blue-500" :
-                  proposal.status === "rejected" ? "bg-red-500" :
-                  proposal.status === "withdrawn" ? "bg-gray-500" :
-                  proposal.status === "submitted" ? "bg-amber-500" :
-                  "gradient-bg-2"
-                }`}></div>
-                
+                <div
+                  className={`h-1.5 w-full ${
+                    proposal.status === "accepted"
+                      ? "bg-green-500"
+                      : proposal.status === "shortlisted"
+                      ? "bg-blue-500"
+                      : proposal.status === "rejected"
+                      ? "bg-red-500"
+                      : proposal.status === "withdrawn"
+                      ? "bg-gray-500"
+                      : proposal.status === "submitted"
+                      ? "bg-amber-500"
+                      : "gradient-bg-2"
+                  }`}
+                ></div>
+
                 <CardContent className="p-0">
                   {/* Header Section with Project Title and Status */}
                   <div className="p-5 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-700 border-b border-gray-100 dark:border-gray-700">
                     <div className="flex items-center justify-between mb-3">
                       <h3 className="text-lg font-bold text-gray-900 dark:text-white line-clamp-1">
-                        <Link href={`/freelancer/proposals/${proposal.proposalId}`} className="hover:text-blue-600 dark:hover:text-blue-400">
+                        <Link
+                          href={`/freelancer/proposals/${proposal.proposalId}`}
+                          className="hover:text-blue-600 dark:hover:text-blue-400"
+                        >
                           {proposal.projectTitle || "Untitled Project"}
                         </Link>
                       </h3>
                       <div className="flex items-center space-x-2">
-                        <Badge className={`${getStatusColor(proposal.status)} px-2.5 py-1`}>
+                        <Badge
+                          className={`${getStatusColor(
+                            proposal.status
+                          )} px-2.5 py-1`}
+                        >
                           {getStatusIcon(proposal.status)}
-                          <span className="ml-1 capitalize font-medium">{mapStatusToDisplay(proposal.status)}</span>
+                          <span className="ml-1 capitalize font-medium">
+                            {mapStatusToDisplay(proposal.status)}
+                          </span>
                         </Badge>
                         {proposal.isInvited && (
                           <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300 border border-purple-200 px-2.5 py-1">
@@ -515,155 +605,251 @@ export default function FreelancerProposalsPage() {
                         )}
                       </div>
                     </div>
-                    
+
                     <div className="flex items-center text-sm text-gray-600 dark:text-gray-300 mb-2">
                       <Calendar className="w-4 h-4 mr-1.5 text-gray-500" />
-                      <span>Submitted: {proposal.submittedAt instanceof Timestamp 
-                        ? proposal.submittedAt.toDate().toLocaleDateString('en-US', {year: 'numeric', month: 'short', day: 'numeric'})
-                        : proposal.submittedAt ? new Date(proposal.submittedAt).toLocaleDateString('en-US', {year: 'numeric', month: 'short', day: 'numeric'})
-                        : "Unknown"}</span>
+                      <span>
+                        Submitted:{" "}
+                        {proposal.submittedAt instanceof Timestamp
+                          ? proposal.submittedAt
+                              .toDate()
+                              .toLocaleDateString("en-US", {
+                                year: "numeric",
+                                month: "short",
+                                day: "numeric",
+                              })
+                          : proposal.submittedAt
+                          ? new Date(proposal.submittedAt).toLocaleDateString(
+                              "en-US",
+                              {
+                                year: "numeric",
+                                month: "short",
+                                day: "numeric",
+                              }
+                            )
+                          : "Unknown"}
+                      </span>
                     </div>
-                    
+
                     {/* Client Information */}
                     <div className="flex items-center space-x-3 mt-3">
                       <Image
-                        src={proposal.clientInfo?.photoURL || "/placeholder-user.jpg"}
+                        src={
+                          proposal.clientInfo?.photoURL ||
+                          "/placeholder-user.jpg"
+                        }
                         alt={proposal.clientInfo?.name || "Client"}
                         width={36}
                         height={36}
                         className="rounded-full border-2 border-white shadow-sm"
                       />
                       <div className="flex items-center space-x-2 flex-wrap">
-                        <span className="text-sm font-medium text-gray-900 dark:text-white">{proposal.clientInfo?.name || "Client"}</span>
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">
+                          {proposal.clientInfo?.name || "Client"}
+                        </span>
                         {proposal.clientInfo?.rating && (
                           <div className="flex items-center">
-                            <span className="text-xs text-gray-400 mx-1">•</span>
+                            <span className="text-xs text-gray-400 mx-1">
+                              •
+                            </span>
                             <div className="flex items-center">
                               <Star className="w-3.5 h-3.5 text-yellow-500 mr-0.5" />
-                              <span className="text-xs text-gray-600 dark:text-gray-400">{proposal.clientInfo.rating}</span>
+                              <span className="text-xs text-gray-600 dark:text-gray-400">
+                                {proposal.clientInfo.rating}
+                              </span>
                             </div>
                           </div>
                         )}
                         {proposal.clientInfo?.location && (
                           <div className="flex items-center">
-                            <span className="text-xs text-gray-400 mx-1">•</span>
+                            <span className="text-xs text-gray-400 mx-1">
+                              •
+                            </span>
                             <div className="flex items-center">
                               <MapPin className="w-3.5 h-3.5 text-gray-500 mr-0.5" />
-                              <span className="text-xs text-gray-600 dark:text-gray-400">{proposal.clientInfo.location}</span>
+                              <span className="text-xs text-gray-600 dark:text-gray-400">
+                                {proposal.clientInfo.location}
+                              </span>
                             </div>
                           </div>
                         )}
                       </div>
                     </div>
                   </div>
-                  
+
                   {/* Financial Details */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-0 divide-x divide-y md:divide-y-0 divide-gray-100 dark:divide-gray-700">
                     <div className="p-4">
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-medium uppercase">Your Bid</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-medium uppercase">
+                        Your Bid
+                      </p>
                       <p className="text-lg font-bold text-gray-900 dark:text-white">
-                        {proposal.bid && typeof proposal.bid.amount === 'number' ? 
-                          `${proposal.bid.currency || '$'}${proposal.bid.amount.toLocaleString()}` : 
-                          "Not specified"}
+                        {proposal.bid && typeof proposal.bid.amount === "number"
+                          ? `${
+                              proposal.bid.currency || "$"
+                            }${proposal.bid.amount.toLocaleString()}`
+                          : "Not specified"}
                       </p>
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        {proposal.bid?.type === "fixed" ? "Fixed Price" : "Hourly Rate"}
+                        {proposal.bid?.type === "fixed"
+                          ? "Fixed Price"
+                          : "Hourly Rate"}
                       </p>
                     </div>
-                    
+
                     <div className="p-4">
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-medium uppercase">Client Budget</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-medium uppercase">
+                        Client Budget
+                      </p>
                       <p className="text-sm font-medium text-gray-900 dark:text-white">
-                        {proposal.projectBudget ? (
-                          proposal.projectBudget.type === "fixed" && typeof proposal.projectBudget.amount === 'number' ? 
-                            `${proposal.projectBudget.currency || '$'}${proposal.projectBudget.amount.toLocaleString()}` 
-                          : typeof proposal.projectBudget.minAmount === 'number' && typeof proposal.projectBudget.maxAmount === 'number' ?
-                            `${proposal.projectBudget.currency || '$'}${proposal.projectBudget.minAmount.toLocaleString()} - ${proposal.projectBudget.maxAmount.toLocaleString()}`
-                          : "Not specified"
-                        ) : "Not specified"}
+                        {proposal.projectBudget
+                          ? proposal.projectBudget.type === "fixed" &&
+                            typeof proposal.projectBudget.amount === "number"
+                            ? `${
+                                proposal.projectBudget.currency || "$"
+                              }${proposal.projectBudget.amount.toLocaleString()}`
+                            : typeof proposal.projectBudget.minAmount ===
+                                "number" &&
+                              typeof proposal.projectBudget.maxAmount ===
+                                "number"
+                            ? `${
+                                proposal.projectBudget.currency || "$"
+                              }${proposal.projectBudget.minAmount.toLocaleString()} - ${proposal.projectBudget.maxAmount.toLocaleString()}`
+                            : "Not specified"
+                          : "Not specified"}
                       </p>
                     </div>
-                    
+
                     <div className="p-4">
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-medium uppercase">Timeline</p>
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">{proposal.bid?.timeline || "Not specified"}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-medium uppercase">
+                        Timeline
+                      </p>
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">
+                        {proposal.bid?.timeline || "Not specified"}
+                      </p>
                     </div>
-                    
+
                     <div className="p-4">
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-medium uppercase">Delivery</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-medium uppercase">
+                        Delivery
+                      </p>
                       <p className="text-sm font-medium text-gray-900 dark:text-white">
                         {proposal.bid?.deliveryDate instanceof Timestamp
-                          ? proposal.bid.deliveryDate.toDate().toLocaleDateString('en-US', {month: 'short', day: 'numeric'})
-                          : proposal.bid?.deliveryDate ? new Date(proposal.bid.deliveryDate).toLocaleDateString('en-US', {month: 'short', day: 'numeric'}) 
+                          ? proposal.bid.deliveryDate
+                              .toDate()
+                              .toLocaleDateString("en-US", {
+                                month: "short",
+                                day: "numeric",
+                              })
+                          : proposal.bid?.deliveryDate
+                          ? new Date(
+                              proposal.bid.deliveryDate
+                            ).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                            })
                           : "Not specified"}
                       </p>
                     </div>
                   </div>
-                  
+
                   {/* Skills Section */}
                   {proposal.skills && proposal.skills.length > 0 && (
                     <div className="px-5 py-3 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
                       <div className="flex flex-wrap gap-1.5">
                         {proposal.skills.slice(0, 5).map((skill) => (
-                          <Badge key={skill} variant="secondary" className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
+                          <Badge
+                            key={skill}
+                            variant="secondary"
+                            className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300"
+                          >
                             {skill}
                           </Badge>
                         ))}
                         {proposal.skills.length > 5 && (
-                          <Badge variant="secondary" className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300">
+                          <Badge
+                            variant="secondary"
+                            className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300"
+                          >
                             +{proposal.skills.length - 5} more
                           </Badge>
                         )}
                       </div>
                     </div>
                   )}
-                  
+
                   {/* Action Buttons */}
                   <div className="flex items-center justify-between p-4 border-t border-gray-100 dark:border-gray-700">
                     <div className="text-sm text-gray-500 dark:text-gray-400">
                       ID: {proposal.proposalId.substring(0, 8)}
                     </div>
-                    
+
                     <div className="flex items-center gap-2">
                       {proposal.status === "shortlisted" && (
-                        <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" asChild>
-                          <Link href={`/messages?proposal=${proposal.proposalId}`}>
+                        <Button
+                          size="sm"
+                          className="bg-blue-600 hover:bg-blue-700 text-white"
+                          asChild
+                        >
+                          <Link
+                            href={`/messages?proposal=${proposal.proposalId}`}
+                          >
                             <MessageSquare className="w-4 h-4 mr-1" />
                             Message
                           </Link>
                         </Button>
                       )}
-                      
+
                       {proposal.status === "accepted" && (
-                        <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" asChild>
-                          <Link href={`/freelancer/contracts/${proposal.proposalId}`}>View Contract</Link>
+                        <Button
+                          size="sm"
+                          className="bg-green-600 hover:bg-green-700 text-white"
+                          asChild
+                        >
+                          <Link href={`/freelancer/contracts`}>
+                            <FileText className="w-4 h-4 mr-1" />
+                            View Contract
+                          </Link>
                         </Button>
                       )}
-                      
-                      <Button size="sm" variant="outline" className="bg-white hover:bg-gray-50 dark:bg-gray-700 dark:hover:bg-gray-600" asChild>
-                        <Link href={`/freelancer/proposals/${proposal.proposalId}`}>
+
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="bg-white hover:bg-gray-50 dark:bg-gray-700 dark:hover:bg-gray-600"
+                        asChild
+                      >
+                        <Link
+                          href={`/freelancer/proposals/${proposal.proposalId}`}
+                        >
                           <Eye className="w-4 h-4 mr-1" />
                           View
                         </Link>
                       </Button>
-                      
+
                       {proposal.status === "submitted" && (
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
-                          className="bg-white hover:bg-blue-50 text-blue-600 hover:text-blue-700 border-blue-200" 
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="bg-white hover:bg-blue-50 text-blue-600 hover:text-blue-700 border-blue-200"
                           asChild
                         >
-                          <Link href={`/projects/${proposal.projectId}/proposal?edit=true&proposalId=${proposal.proposalId}`}>Edit</Link>
+                          <Link
+                            href={`/projects/${proposal.projectId}/proposal?edit=true&proposalId=${proposal.proposalId}`}
+                          >
+                            Edit
+                          </Link>
                         </Button>
                       )}
-                      
-                      {(proposal.status === "submitted" || proposal.status === "shortlisted") && (
-                        <Button 
-                          variant="outline" 
+
+                      {(proposal.status === "submitted" ||
+                        proposal.status === "shortlisted") && (
+                        <Button
+                          variant="outline"
                           size="sm"
                           className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          onClick={() => openWithdrawModal(proposal.proposalId)}>
+                          onClick={() => openWithdrawModal(proposal.proposalId)}
+                        >
                           Withdraw
                         </Button>
                       )}
@@ -676,7 +862,9 @@ export default function FreelancerProposalsPage() {
             <Card className="border-0 shadow-lg">
               <CardContent className="p-12 text-center">
                 <Send className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No proposals found</h3>
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                  No proposals found
+                </h3>
                 <p className="text-gray-600 dark:text-gray-400 mb-4">
                   {searchQuery || statusFilter !== "all"
                     ? "Try adjusting your search or filters"
@@ -691,5 +879,5 @@ export default function FreelancerProposalsPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }
