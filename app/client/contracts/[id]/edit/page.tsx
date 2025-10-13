@@ -11,6 +11,9 @@ import {
   serverTimestamp,
   getDoc,
   addDoc,
+  query,
+  where,
+  getDocs,
 } from "firebase/firestore";
 import { db } from "@/firebase";
 import { format } from "date-fns";
@@ -278,8 +281,7 @@ export default function EditContractPage({
 
     // Track which fields have changed
     const changed: string[] = [];
-    if (contract.terms.amount !== originalContract.terms.amount)
-      changed.push("amount");
+    // No longer check contract.terms.amount directly as it's calculated from milestones
     if (contract.terms.currency !== originalContract.terms.currency)
       changed.push("currency");
     if (contract.terms.paymentType !== originalContract.terms.paymentType)
@@ -435,6 +437,7 @@ export default function EditContractPage({
       const contractData: any = {
         terms: {
           ...contract.terms,
+          amount: totalContractAmount, // Use calculated total from milestones
           startDate: contract.terms.startDate,
           endDate: contract.terms.endDate,
         },
@@ -866,20 +869,27 @@ export default function EditContractPage({
                     </Select>
                   </div>
                   <div>
-                    <Label htmlFor="amount">
-                      Total Amount ({contract.terms.currency})
+                    <Label
+                      htmlFor="amount"
+                      className="flex items-center justify-between"
+                    >
+                      <span>Total Amount ({contract.terms.currency})</span>
+                      <Badge variant="outline" className="ml-2 bg-gray-100">
+                        Auto-calculated
+                      </Badge>
                     </Label>
-                    <Input
-                      id="amount"
-                      type="number"
-                      value={contract.terms.amount}
-                      onChange={(e) =>
-                        handleTermsChange("amount", parseFloat(e.target.value))
-                      }
-                      min={0}
-                      step={1}
-                      className="mt-1.5"
-                    />
+                    <div className="mt-1.5 relative">
+                      <Input
+                        id="amount"
+                        type="text"
+                        value={`${totalContractAmount.toLocaleString()}`}
+                        disabled={true}
+                        className="bg-gray-50 text-gray-800"
+                      />
+                      <div className="text-xs text-gray-500 mt-1">
+                        Total is automatically calculated from milestone amounts
+                      </div>
+                    </div>
                   </div>
                 </div>
 
