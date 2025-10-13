@@ -1206,7 +1206,7 @@ export default function FreelancerContractDetailsPage({
                   variant="outline"
                   className="w-full"
                   onClick={() =>
-                    router.push(`/freelancers/${contract.clientId}`)
+                    router.push(`/profile/${contract.clientId}`)
                   }
                 >
                   View Profile
@@ -1530,6 +1530,16 @@ export default function FreelancerContractDetailsPage({
                                     <span>
                                       {contract.terms.currency}{" "}
                                       {milestone.amount.toLocaleString()}
+                                      {milestone.status === "completed" && (
+                                        <span className="text-gray-500 ml-2">
+                                          (You receive:{" "}
+                                          {contract.terms.currency}{" "}
+                                          {(
+                                            milestone.amount * 0.9
+                                          ).toLocaleString()}{" "}
+                                          after 10% platform fee)
+                                        </span>
+                                      )}
                                     </span>
                                   </div>
                                   <div className="flex items-center">
