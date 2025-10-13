@@ -14,6 +14,7 @@ import {
   getDocs,
   addDoc,
   serverTimestamp,
+  orderBy,
 } from "firebase/firestore";
 import { db } from "@/firebase";
 import { format } from "date-fns";
@@ -130,6 +131,7 @@ export default function ContractDetailsPage({
   const [project, setProject] = useState<any>(null);
   const [freelancer, setFreelancer] = useState<any>(null);
   const [payments, setPayments] = useState<any[]>([]);
+  const [contractEvents, setContractEvents] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState("overview");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [comment, setComment] = useState("");
@@ -144,6 +146,9 @@ export default function ContractDetailsPage({
   // Dialog states
   const [showPayDialog, setShowPayDialog] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [showApproveDialog, setShowApproveDialog] = useState(false);
+  const [showActivityApproveDialog, setShowActivityApproveDialog] =
+    useState(false);
   const [selectedMilestone, setSelectedMilestone] = useState<any>(null);
 
   // Calculate total contract amount from milestones
@@ -244,6 +249,22 @@ export default function ContractDetailsPage({
         }));
 
         setPayments(paymentsData);
+
+        // Get contract events data
+        const eventsRef = query(
+          collection(db, "contractEvents"),
+          where("contractId", "==", resolvedParams.id),
+          orderBy("createdAt", "desc")
+        );
+        const eventsSnap = await getDocs(eventsRef);
+
+        const eventsData = eventsSnap.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+          createdAt: doc.data().createdAt?.toDate() || new Date(),
+        }));
+
+        setContractEvents(eventsData);
         setLoading(false);
       } catch (err: any) {
         console.error("Error fetching contract details:", err);
@@ -548,143 +569,101 @@ export default function ContractDetailsPage({
         return;
       }
 
-      // Update payment status
+      // Update payment status to completed (release from escrow)
       await updateDoc(doc(db, "payments", milestonePayment.id), {
         status: "completed",
         completedAt: serverTimestamp(),
+        escrow: {
+          releasedAt: serverTimestamp(),
+          releaseCondition: "milestone_completion_approval",
+        },
       });
 
-      // Update milestone status
-      const updatedMilestones = contract.milestones.map((m: any) => {
-        if (m.id === milestone.id) {
-          return { ...m, status: "complete" };
-        }
-        return m;
-      });
-
-      await updateDoc(doc(db, "contracts", contract.id), {
-        milestones: updatedMilestones,
-        updatedAt: serverTimestamp(),
-      });
-
-      // Calculate progress
-      const completedMilestones = updatedMilestones.filter(
-        (m: any) => m.status === "complete"
-      ).length;
-      const progress = Math.floor(
-        (completedMilestones / updatedMilestones.length) * 100
-      );
-
-      // Update contract progress
-      await updateDoc(doc(db, "contracts", contract.id), {
-        progress,
-      });
-
-      // If all milestones are complete, mark contract as completed
-      const allComplete = updatedMilestones.every(
-        (m: any) => m.status === "complete"
-      );
-
-      if (allComplete) {
-        await updateDoc(doc(db, "contracts", contract.id), {
-          status: "completed",
-          completedAt: serverTimestamp(),
-        });
-
-        // Add contract completion event
-        await addDoc(collection(db, "contractEvents"), {
-          contractId: contract.id,
-          eventType: "contract_completed",
-          createdBy: user.userId,
-          userType: "client",
-          comment: "All milestones completed. Contract completed.",
-          createdAt: serverTimestamp(),
-        });
-
-        setContract({
-          ...contract,
-          status: "completed",
-          progress: 100,
-          milestones: updatedMilestones,
-        });
-      } else {
-        // If there's a next milestone, activate it
-        const currentIndex = updatedMilestones.findIndex(
-          (m: any) => m.id === milestone.id
-        );
-        const nextMilestone = updatedMilestones[currentIndex + 1];
-
-        if (nextMilestone) {
-          const updatedMilestonesWithNext = updatedMilestones.map(
-            (m: any, index: number) => {
-              if (index === currentIndex + 1) {
-                return { ...m, status: "active" };
-              }
-              return m;
-            }
-          );
-
-          await updateDoc(doc(db, "contracts", contract.id), {
-            milestones: updatedMilestonesWithNext,
-          });
-
-          setContract({
-            ...contract,
-            progress,
-            milestones: updatedMilestonesWithNext,
-          });
-        } else {
-          setContract({
-            ...contract,
-            progress,
-            milestones: updatedMilestones,
-          });
-        }
-      }
-
-      // Add payment release event
+      // Add milestone payment release event
       await addDoc(collection(db, "contractEvents"), {
         contractId: contract.id,
         milestoneId: milestone.id,
         eventType: "milestone_payment_released",
         createdBy: user.userId,
         userType: "client",
-        comment: `Released payment for milestone: ${milestone.title}`,
+        comment: comment || "Payment released to freelancer.",
         amount: milestone.amount,
         currency: contract.terms.currency,
+        metadata: {
+          paymentReleasedTo: contract.freelancerId,
+          netAmount: milestone.amount * 0.9, // After platform fee
+          platformFee: milestone.amount * 0.1, // 10% platform fee
+        },
         createdAt: serverTimestamp(),
       });
 
-      toast({
-        title: "Payment Released",
-        description:
-          "The milestone payment has been released to the freelancer.",
-      });
+      // Update UI state with latest contract data
+      // Refresh contract data
+      const contractRef = doc(db, "contracts", contract.id);
+      const contractSnap = await getDoc(contractRef);
+      if (contractSnap.exists()) {
+        const contractData = contractSnap.data();
+        const formattedContract = {
+          id: contractSnap.id,
+          ...contractData,
+          terms: {
+            ...contractData.terms,
+            startDate: contractData.terms?.startDate?.toDate() || new Date(),
+            endDate: contractData.terms?.endDate?.toDate() || new Date(),
+          },
+          milestones: Array.isArray(contractData.milestones)
+            ? contractData.milestones.map((m: any) => ({
+                ...m,
+                dueDate: m.dueDate?.toDate() || new Date(),
+              }))
+            : [],
+          createdAt: contractData.createdAt?.toDate() || new Date(),
+          updatedAt: contractData.updatedAt?.toDate() || new Date(),
+        };
+        setContract(formattedContract);
+      }
 
       // Refresh payments data
       const paymentsRef = query(
         collection(db, "payments"),
-        where("contractId", "==", resolvedParams.id)
+        where("contractId", "==", contract.id)
       );
       const paymentsSnap = await getDocs(paymentsRef);
-
       const paymentsData = paymentsSnap.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
         createdAt: doc.data().createdAt?.toDate() || new Date(),
       }));
-
       setPayments(paymentsData);
 
-      setIsSubmitting(false);
-    } catch (err: any) {
-      console.error("Error releasing payment:", err);
+      // Refresh events data
+      const eventsRef = query(
+        collection(db, "contractEvents"),
+        where("contractId", "==", contract.id),
+        orderBy("createdAt", "desc")
+      );
+      const eventsSnap = await getDocs(eventsRef);
+      const eventsData = eventsSnap.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+        createdAt: doc.data().createdAt?.toDate() || new Date(),
+      }));
+      setContractEvents(eventsData);
+
+      toast({
+        title: "Success",
+        description: "Payment released successfully.",
+      });
+    } catch (error) {
+      console.error("Error releasing payment:", error);
       toast({
         title: "Error",
-        description: "Failed to release the payment. Please try again.",
+        description: "Failed to release payment.",
         variant: "destructive",
       });
+    } finally {
       setIsSubmitting(false);
+      setComment("");
     }
   };
 
@@ -857,17 +836,7 @@ export default function ContractDetailsPage({
         return;
       }
 
-      // Update payment status to completed (release from escrow)
-      await updateDoc(doc(db, "payments", milestonePayment.id), {
-        status: "completed",
-        completedAt: serverTimestamp(),
-        escrow: {
-          releasedAt: serverTimestamp(),
-          releaseCondition: "milestone_completion_approval",
-        },
-      });
-
-      // Update milestone status to completed
+      // Update milestone status to completed but don't release payment yet
       const updatedMilestones = contract.milestones.map((m: any) => {
         if (m.id === milestone.id) {
           return { ...m, status: "completed", approvedAt: new Date() };
@@ -884,17 +853,15 @@ export default function ContractDetailsPage({
       await addDoc(collection(db, "contractEvents"), {
         contractId: contract.id,
         milestoneId: milestone.id,
-        eventType: "milestone_payment_released",
+        eventType: "milestone_approved",
         createdBy: user.userId,
         userType: "client",
-        comment: comment || "Excellent work quality. Payment released.",
+        comment: comment || "Work approved. Milestone completed.",
         amount: milestone.amount,
         currency: contract.terms.currency,
         metadata: {
           previousMilestoneStatus: "in_review",
           newMilestoneStatus: "completed",
-          paymentReleasedTo: contract.freelancerId,
-          netAmount: milestone.amount * 0.9, // After platform fee
         },
         createdAt: serverTimestamp(),
       });
@@ -946,48 +913,18 @@ export default function ContractDetailsPage({
           progress: 100,
           milestones: updatedMilestones,
         });
-      } else {
-        // If there's a next milestone, activate it
-        const currentIndex = updatedMilestones.findIndex(
-          (m: any) => m.id === milestone.id
-        );
-        const nextMilestone = updatedMilestones[currentIndex + 1];
-
-        if (nextMilestone) {
-          const updatedMilestonesWithNext = updatedMilestones.map(
-            (m: any, index: number) => {
-              if (index === currentIndex + 1) {
-                return { ...m, status: "active" };
-              }
-              return m;
-            }
-          );
-
-          await updateDoc(doc(db, "contracts", contract.id), {
-            milestones: updatedMilestonesWithNext,
-          });
-
-          setContract({
-            ...contract,
-            progress,
-            milestones: updatedMilestonesWithNext,
-          });
-        } else {
-          setContract({
-            ...contract,
-            progress,
-            milestones: updatedMilestones,
-          });
-        }
       }
 
       toast({
         title: "Milestone Approved",
-        description: "Payment has been released to the freelancer.",
+        description:
+          "Milestone has been approved. You can now release payment.",
       });
 
       setIsSubmitting(false);
       setComment("");
+      setShowApproveDialog(false);
+      setShowActivityApproveDialog(false);
     } catch (err: any) {
       console.error("Error approving milestone:", err);
       toast({
@@ -1775,7 +1712,7 @@ export default function ContractDetailsPage({
                   variant="outline"
                   className="w-full"
                   onClick={() =>
-                    router.push(`/freelancers/${contract.freelancerId}`)
+                    router.push(`/profile/${contract.freelancerId}`)
                   }
                 >
                   View Profile
@@ -1883,6 +1820,7 @@ export default function ContractDetailsPage({
           <TabsList className="mb-8">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="milestones">Milestones</TabsTrigger>
+            <TabsTrigger value="activity">Activity</TabsTrigger>
             <TabsTrigger value="payments">Payments</TabsTrigger>
           </TabsList>
 
@@ -1974,11 +1912,15 @@ export default function ContractDetailsPage({
                                     </Button>
                                   )}
 
-                                {milestone.status === "active" &&
-                                  hasMilestonePayment(milestone.id) && (
+                                {milestone.status === "completed" &&
+                                  hasMilestonePayment(milestone.id) &&
+                                  payments.find(
+                                    (p) => p.milestoneId === milestone.id
+                                  )?.status !== "completed" && (
                                     <Button
                                       size="sm"
                                       variant="outline"
+                                      className="border-green-500 text-green-600 hover:bg-green-50"
                                       onClick={() =>
                                         releaseMilestonePayment(milestone)
                                       }
@@ -2104,13 +2046,17 @@ export default function ContractDetailsPage({
                                 {milestone.status === "in_review" &&
                                   hasMilestonePayment(milestone.id) && (
                                     <>
-                                      <Dialog>
+                                      <Dialog
+                                        open={showApproveDialog}
+                                        onOpenChange={setShowApproveDialog}
+                                      >
                                         <DialogTrigger asChild>
                                           <Button
                                             size="sm"
                                             onClick={() => {
                                               setSelectedMilestone(milestone);
                                               setComment("");
+                                              setShowApproveDialog(true);
                                             }}
                                           >
                                             Approve
@@ -2122,8 +2068,10 @@ export default function ContractDetailsPage({
                                               Approve Milestone
                                             </DialogTitle>
                                             <DialogDescription>
-                                              Approve "{milestone.title}" and
-                                              release payment to the freelancer.
+                                              Approve the work for "
+                                              {milestone.title}". You'll be able
+                                              to release payment separately
+                                              after approval.
                                             </DialogDescription>
                                           </DialogHeader>
                                           <div className="py-4">
@@ -2146,7 +2094,10 @@ export default function ContractDetailsPage({
                                           <DialogFooter>
                                             <Button
                                               variant="outline"
-                                              onClick={() => setComment("")}
+                                              onClick={() => {
+                                                setComment("");
+                                                setShowApproveDialog(false);
+                                              }}
                                             >
                                               Cancel
                                             </Button>
@@ -2166,7 +2117,7 @@ export default function ContractDetailsPage({
                                                   Approving
                                                 </>
                                               ) : (
-                                                "Approve & Release Payment"
+                                                "Approve Work"
                                               )}
                                             </Button>
                                           </DialogFooter>
@@ -2269,10 +2220,111 @@ export default function ContractDetailsPage({
                             )}
 
                             {milestone.status === "completed" && (
-                              <Badge className="bg-green-100 text-green-800 border-green-200">
-                                <CheckCircle className="h-3.5 w-3.5 mr-1" />
-                                Completed
-                              </Badge>
+                              <div className="flex gap-2 items-center">
+                                <Badge className="bg-green-100 text-green-800 border-green-200">
+                                  <CheckCircle className="h-3.5 w-3.5 mr-1" />
+                                  Completed
+                                </Badge>
+
+                                {/* Check if payment has not been released yet */}
+                                {hasMilestonePayment(milestone.id) &&
+                                  payments.find(
+                                    (p) => p.milestoneId === milestone.id
+                                  )?.status !== "completed" && (
+                                    <Dialog>
+                                      <DialogTrigger asChild>
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          className="border-green-500 text-green-600 hover:bg-green-50"
+                                          onClick={() => {
+                                            setSelectedMilestone(milestone);
+                                            setComment("");
+                                          }}
+                                        >
+                                          Release Payment
+                                        </Button>
+                                      </DialogTrigger>
+                                      <DialogContent>
+                                        <DialogHeader>
+                                          <DialogTitle>
+                                            Release Payment
+                                          </DialogTitle>
+                                          <DialogDescription>
+                                            Release payment for "
+                                            {milestone.title}" to the
+                                            freelancer. The freelancer will
+                                            receive 90% ($
+                                            {(milestone.amount * 0.9).toFixed(
+                                              2
+                                            )}
+                                            ) of the milestone amount. 10% ($
+                                            {(milestone.amount * 0.1).toFixed(
+                                              2
+                                            )}
+                                            ) is the BizzLink platform fee.
+                                          </DialogDescription>
+                                        </DialogHeader>
+                                        <div className="py-4">
+                                          <label
+                                            htmlFor="payment-comment"
+                                            className="text-sm font-medium"
+                                          >
+                                            Payment Comment (optional)
+                                          </label>
+                                          <Textarea
+                                            id="payment-comment"
+                                            placeholder="Add a comment for this payment release..."
+                                            className="mt-2"
+                                            value={comment}
+                                            onChange={(e) =>
+                                              setComment(e.target.value)
+                                            }
+                                          />
+                                        </div>
+                                        <DialogFooter>
+                                          <Button
+                                            variant="outline"
+                                            onClick={() => setComment("")}
+                                          >
+                                            Cancel
+                                          </Button>
+                                          <Button
+                                            onClick={() => {
+                                              if (selectedMilestone) {
+                                                releaseMilestonePayment(
+                                                  selectedMilestone
+                                                );
+                                              }
+                                            }}
+                                            disabled={isSubmitting}
+                                            className="bg-green-600 hover:bg-green-700"
+                                          >
+                                            {isSubmitting ? (
+                                              <>
+                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                Processing
+                                              </>
+                                            ) : (
+                                              "Release Payment"
+                                            )}
+                                          </Button>
+                                        </DialogFooter>
+                                      </DialogContent>
+                                    </Dialog>
+                                  )}
+
+                                {/* Show if payment has been released */}
+                                {hasMilestonePayment(milestone.id) &&
+                                  payments.find(
+                                    (p) => p.milestoneId === milestone.id
+                                  )?.status === "completed" && (
+                                    <Badge className="bg-blue-100 text-blue-800 border-blue-200">
+                                      <CheckCircle className="h-3.5 w-3.5 mr-1" />
+                                      Paid
+                                    </Badge>
+                                  )}
+                              </div>
                             )}
                           </TableCell>
                         </TableRow>
@@ -2378,7 +2430,7 @@ export default function ContractDetailsPage({
                                 <div className="flex items-center">
                                   {payment.paymentMethod?.type === "card" && (
                                     <div className="w-8 h-5 bg-blue-100 rounded flex items-center justify-center text-xs font-medium text-blue-800 mr-2">
-                                      Card
+                                      Visa
                                     </div>
                                   )}
                                   {payment.paymentMethod?.type === "paypal" && (
@@ -2415,6 +2467,405 @@ export default function ContractDetailsPage({
                         })}
                     </TableBody>
                   </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Activity Tab */}
+          <TabsContent value="activity">
+            <Card>
+              <CardHeader>
+                <CardTitle>Contract Activity & Submissions</CardTitle>
+                <CardDescription>
+                  Track milestone submissions and other contract events
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {contractEvents.length === 0 ? (
+                  <div className="text-center py-12">
+                    <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900">
+                      No Activity Yet
+                    </h3>
+                    <p className="text-gray-600 max-w-md mx-auto mt-2">
+                      When milestones are submitted or other actions are taken,
+                      they will appear here.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {contractEvents.map((event) => {
+                      const eventDate = event.createdAt
+                        ? format(
+                            new Date(event.createdAt),
+                            "MMM d, yyyy 'at' h:mm a"
+                          )
+                        : "";
+
+                      return (
+                        <div
+                          key={event.id}
+                          className="border rounded-lg p-4 relative"
+                        >
+                          {/* Event Header */}
+                          <div className="flex flex-col sm:flex-row sm:justify-between mb-3">
+                            <div className="flex items-center mb-2 sm:mb-0">
+                              {event.eventType === "milestone_submitted" && (
+                                <Badge className="bg-blue-100 text-blue-800 border-blue-200 mb-1 sm:mb-0 mr-2">
+                                  Milestone Submitted
+                                </Badge>
+                              )}
+
+                              {event.eventType === "milestone_approved" && (
+                                <Badge className="bg-green-100 text-green-800 border-green-200 mb-1 sm:mb-0 mr-2">
+                                  Milestone Approved
+                                </Badge>
+                              )}
+
+                              {(event.eventType === "milestone_rejected" ||
+                                event.eventType === "revision_requested") && (
+                                <Badge className="bg-amber-100 text-amber-800 border-amber-200 mb-1 sm:mb-0 mr-2">
+                                  Revision Requested
+                                </Badge>
+                              )}
+
+                              {event.eventType ===
+                                "milestone_payment_released" && (
+                                <Badge className="bg-indigo-100 text-indigo-800 border-indigo-200 mb-1 sm:mb-0 mr-2">
+                                  Payment Released
+                                </Badge>
+                              )}
+
+                              {event.eventType === "milestone_funded" && (
+                                <Badge className="bg-purple-100 text-purple-800 border-purple-200 mb-1 sm:mb-0 mr-2">
+                                  Milestone Funded
+                                </Badge>
+                              )}
+                            </div>
+                            <span className="text-gray-500 text-sm">
+                              {eventDate}
+                            </span>
+                          </div>
+
+                          {/* Event Description */}
+                          <div className="mb-3">
+                            <p className="text-gray-700">
+                              {event.comment || "No comment provided"}
+                            </p>
+                          </div>
+
+                          {/* Milestone Submissions */}
+                          {event.eventType === "milestone_submitted" &&
+                            event.metadata &&
+                            event.metadata.submissionDetails && (
+                              <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                                <h4 className="font-medium text-blue-900 mb-2">
+                                  Submission Details
+                                </h4>
+
+                                {/* Milestone Title */}
+                                {event.milestoneId && contract?.milestones && (
+                                  <div className="mb-2">
+                                    <p className="text-xs text-blue-700 mb-1">
+                                      Milestone:
+                                    </p>
+                                    <p className="text-sm font-medium">
+                                      {contract.milestones.find(
+                                        (m: any) => m.id === event.milestoneId
+                                      )?.title || "Unknown Milestone"}
+                                    </p>
+                                  </div>
+                                )}
+
+                                {/* Submission Description */}
+                                {event.metadata.submissionDetails
+                                  .description && (
+                                  <div className="mb-3">
+                                    <p className="text-xs text-blue-700 mb-1">
+                                      Description:
+                                    </p>
+                                    <p className="text-sm bg-white p-2 rounded border border-blue-100">
+                                      {
+                                        event.metadata.submissionDetails
+                                          .description
+                                      }
+                                    </p>
+                                  </div>
+                                )}
+
+                                {/* Submission Links */}
+                                {event.metadata.submissionDetails.links &&
+                                  event.metadata.submissionDetails.links
+                                    .length > 0 && (
+                                    <div className="mb-3">
+                                      <p className="text-xs text-blue-700 mb-1">
+                                        Links:
+                                      </p>
+                                      <ul className="list-disc pl-5 space-y-1">
+                                        {event.metadata.submissionDetails.links.map(
+                                          (link: string, linkIdx: number) => (
+                                            <li
+                                              key={linkIdx}
+                                              className="text-sm"
+                                            >
+                                              <a
+                                                href={link}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-blue-600 hover:underline"
+                                              >
+                                                {link}
+                                              </a>
+                                            </li>
+                                          )
+                                        )}
+                                      </ul>
+                                    </div>
+                                  )}
+
+                                {/* Submission Files */}
+                                {event.metadata.submissionDetails.files &&
+                                  event.metadata.submissionDetails.files
+                                    .length > 0 && (
+                                    <div>
+                                      <p className="text-xs text-blue-700 mb-1">
+                                        Files:
+                                      </p>
+                                      <ul className="list-disc pl-5 space-y-1">
+                                        {event.metadata.submissionDetails.files.map(
+                                          (file: any, fileIdx: number) => (
+                                            <li
+                                              key={fileIdx}
+                                              className="text-sm"
+                                            >
+                                              <a
+                                                href={file.fileUrl || file.url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-blue-600 hover:underline flex items-center"
+                                              >
+                                                <FileText className="w-4 h-4 mr-1" />
+                                                {file.fileName ||
+                                                  file.name ||
+                                                  "Download File"}
+                                              </a>
+                                            </li>
+                                          )
+                                        )}
+                                      </ul>
+                                    </div>
+                                  )}
+
+                                {/* Actions for in_review milestones */}
+                                {event.eventType === "milestone_submitted" &&
+                                  event.milestoneId &&
+                                  contract?.milestones &&
+                                  contract.milestones.find(
+                                    (m: any) => m.id === event.milestoneId
+                                  )?.status === "in_review" && (
+                                    <div className="mt-4 pt-3 border-t border-blue-200">
+                                      <div className="flex flex-wrap gap-2">
+                                        <Dialog
+                                          open={showActivityApproveDialog}
+                                          onOpenChange={
+                                            setShowActivityApproveDialog
+                                          }
+                                        >
+                                          <DialogTrigger asChild>
+                                            <Button
+                                              size="sm"
+                                              onClick={() => {
+                                                setComment("");
+                                                setShowActivityApproveDialog(
+                                                  true
+                                                );
+                                              }}
+                                            >
+                                              Approve
+                                            </Button>
+                                          </DialogTrigger>
+                                          <DialogContent>
+                                            <DialogHeader>
+                                              <DialogTitle>
+                                                Approve Milestone
+                                              </DialogTitle>
+                                              <DialogDescription>
+                                                Approve the work for this
+                                                milestone. You'll be able to
+                                                release payment separately after
+                                                approval.
+                                              </DialogDescription>
+                                            </DialogHeader>
+                                            <div className="py-4">
+                                              <label
+                                                htmlFor="approval-comment-dialog"
+                                                className="text-sm font-medium"
+                                              >
+                                                Approval Comment (optional)
+                                              </label>
+                                              <Textarea
+                                                id="approval-comment-dialog"
+                                                placeholder="Leave feedback about the work quality..."
+                                                className="mt-2"
+                                                value={comment}
+                                                onChange={(e) =>
+                                                  setComment(e.target.value)
+                                                }
+                                              />
+                                            </div>
+                                            <DialogFooter>
+                                              <Button
+                                                variant="outline"
+                                                onClick={() => {
+                                                  setComment("");
+                                                  setShowActivityApproveDialog(
+                                                    false
+                                                  );
+                                                }}
+                                              >
+                                                Cancel
+                                              </Button>
+                                              <Button
+                                                onClick={() => {
+                                                  const milestone =
+                                                    contract.milestones.find(
+                                                      (m: any) =>
+                                                        m.id ===
+                                                        event.milestoneId
+                                                    );
+                                                  if (milestone) {
+                                                    approveMilestoneSubmission(
+                                                      milestone
+                                                    );
+                                                  }
+                                                }}
+                                                disabled={isSubmitting}
+                                              >
+                                                {isSubmitting ? (
+                                                  <>
+                                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                    Approving
+                                                  </>
+                                                ) : (
+                                                  "Approve Work"
+                                                )}
+                                              </Button>
+                                            </DialogFooter>
+                                          </DialogContent>
+                                        </Dialog>
+
+                                        <Dialog>
+                                          <DialogTrigger asChild>
+                                            <Button size="sm" variant="outline">
+                                              Request Revision
+                                            </Button>
+                                          </DialogTrigger>
+                                          <DialogContent>
+                                            <DialogHeader>
+                                              <DialogTitle>
+                                                Request Revision
+                                              </DialogTitle>
+                                              <DialogDescription>
+                                                Request changes to the submitted
+                                                milestone.
+                                              </DialogDescription>
+                                            </DialogHeader>
+                                            <div className="py-4">
+                                              <label
+                                                htmlFor="revision-comment-dialog"
+                                                className="text-sm font-medium"
+                                              >
+                                                Revision Notes (required)
+                                              </label>
+                                              <Textarea
+                                                id="revision-comment-dialog"
+                                                placeholder="Explain what changes are needed..."
+                                                className="mt-2"
+                                                value={comment}
+                                                onChange={(e) =>
+                                                  setComment(e.target.value)
+                                                }
+                                              />
+                                            </div>
+                                            <DialogFooter>
+                                              <Button
+                                                variant="outline"
+                                                onClick={() => setComment("")}
+                                              >
+                                                Cancel
+                                              </Button>
+                                              <Button
+                                                onClick={() => {
+                                                  const milestone =
+                                                    contract.milestones.find(
+                                                      (m: any) =>
+                                                        m.id ===
+                                                        event.milestoneId
+                                                    );
+                                                  if (
+                                                    milestone &&
+                                                    comment.trim()
+                                                  ) {
+                                                    requestMilestoneRevision(
+                                                      milestone,
+                                                      comment
+                                                    );
+                                                  } else {
+                                                    toast({
+                                                      title: "Error",
+                                                      description:
+                                                        "Please provide revision notes.",
+                                                      variant: "destructive",
+                                                    });
+                                                  }
+                                                }}
+                                                disabled={
+                                                  isSubmitting ||
+                                                  !comment.trim()
+                                                }
+                                                variant="secondary"
+                                              >
+                                                {isSubmitting ? (
+                                                  <>
+                                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                    Requesting Revision
+                                                  </>
+                                                ) : (
+                                                  "Request Revision"
+                                                )}
+                                              </Button>
+                                            </DialogFooter>
+                                          </DialogContent>
+                                        </Dialog>
+                                      </div>
+                                    </div>
+                                  )}
+                              </div>
+                            )}
+
+                          {/* Payment Release Details */}
+                          {event.eventType === "milestone_payment_released" &&
+                            event.metadata && (
+                              <div className="mt-2 text-sm text-gray-600">
+                                <p>
+                                  Amount: {contract.terms.currency}{" "}
+                                  {event.amount?.toLocaleString()}
+                                </p>
+                                {event.metadata.netAmount && (
+                                  <p className="text-xs text-gray-500 mt-1">
+                                    Freelancer received:{" "}
+                                    {contract.terms.currency}{" "}
+                                    {event.metadata.netAmount?.toLocaleString()}
+                                    (after 10% platform fee)
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 )}
               </CardContent>
             </Card>
