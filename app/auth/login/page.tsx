@@ -41,15 +41,15 @@ export default function LoginPage() {
       if (!hasBasicProfile) {
         // User needs to complete basic signup/onboarding
         if (result.role === 'freelancer') {
-          router.push('/freelancer/onboarding')
+          router.push('/freelancer/onboarding/specialty')
         } else if (result.role === 'client') {
-          router.push('/client/onboarding') 
+          router.push('/client/profile') 
         } else {
           router.push('/onboarding')
         }
       } else if (!hasDetailedProfile && result.role === 'freelancer') {
         // Freelancer needs to complete detailed profile setup
-        router.push('/freelancer/onboarding')
+        router.push('/freelancer/onboarding/specialty')
       } else {
         // User has completed setup, redirect to dashboard
         if (result.role === 'freelancer') {
