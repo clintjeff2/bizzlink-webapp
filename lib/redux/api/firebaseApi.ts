@@ -1,5 +1,5 @@
-import { createApi, fakeBaseQuery } from '@reduxjs/toolkit/query/react'
-import { 
+import { createApi, fakeBaseQuery } from "@reduxjs/toolkit/query/react";
+import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
@@ -9,8 +9,8 @@ import {
   sendPasswordResetEmail,
   updateProfile,
   sendEmailVerification,
-  signInAnonymously
-} from 'firebase/auth'
+  signInAnonymously,
+} from "firebase/auth";
 
 // Create a cache for Firestore documents to handle non-serializable data
 const documentCache = new Map();
@@ -23,29 +23,29 @@ const cleanupDocumentCache = () => {
     // and delete oldest entries
     const entries = Array.from(documentCache.entries());
     const toDelete = entries.slice(0, entries.length - 50);
-    
+
     toDelete.forEach(([key]) => {
       documentCache.delete(key);
     });
   }
 };
-import { 
-  doc, 
-  setDoc, 
-  getDoc, 
-  updateDoc, 
-  collection, 
-  query, 
-  where, 
+import {
+  doc,
+  setDoc,
+  getDoc,
+  updateDoc,
+  collection,
+  query,
+  where,
   getDocs,
   orderBy,
   limit,
   startAfter,
   deleteDoc,
-  Timestamp
-} from 'firebase/firestore'
-import { auth, db } from '../../../firebase'
-import type { SignupData as SignupFormData } from '../slices/signupSlice'
+  Timestamp,
+} from "firebase/firestore";
+import { auth, db } from "../../../firebase";
+import type { SignupData as SignupFormData } from "../slices/signupSlice";
 import type {
   User,
   Project,
@@ -81,40 +81,40 @@ import type {
   UserEmployment,
   UserPortfolio,
   UserSkill,
-  UserCertification
-} from '../types/firebaseTypes'
+  UserCertification,
+} from "../types/firebaseTypes";
 
 // Helper function to convert Firestore timestamps to serializable strings
 const serializeUser = (user: any): User => {
   // Create a copy of the user object to avoid mutation
   const serializedUser = { ...user };
-  
+
   // Process all Timestamp fields recursively to make them serializable
   const processObject = (obj: any): any => {
-    if (!obj || typeof obj !== 'object') return obj;
-    
+    if (!obj || typeof obj !== "object") return obj;
+
     // Handle arrays
     if (Array.isArray(obj)) {
-      return obj.map(item => processObject(item));
+      return obj.map((item) => processObject(item));
     }
-    
+
     // Handle objects
     const result: any = {};
     for (const key in obj) {
       const value = obj[key];
-      
+
       // Check if it's a Timestamp
       if (value instanceof Timestamp) {
         result[key] = value.toDate().toISOString();
-      } 
+      }
       // Check if it's a Date
       else if (value instanceof Date) {
         result[key] = value.toISOString();
       }
       // Process nested objects/arrays
-      else if (value && typeof value === 'object') {
+      else if (value && typeof value === "object") {
         result[key] = processObject(value);
-      } 
+      }
       // Pass through other values
       else {
         result[key] = value;
@@ -122,128 +122,166 @@ const serializeUser = (user: any): User => {
     }
     return result;
   };
-  
+
   // Return the serialized user object
   return processObject(serializedUser) as User;
-}
+};
 
 // Helper function to convert Firestore timestamps in projects to serializable strings
 const serializeProject = (project: any): Project => {
   return {
     ...project,
-    createdAt: project.createdAt instanceof Timestamp ? project.createdAt.toDate().toISOString() : project.createdAt,
-    updatedAt: project.updatedAt instanceof Timestamp ? project.updatedAt.toDate().toISOString() : project.updatedAt,
-    publishedAt: project.publishedAt instanceof Timestamp ? project.publishedAt.toDate().toISOString() : project.publishedAt,
-    closedAt: project.closedAt instanceof Timestamp ? project.closedAt.toDate().toISOString() : project.closedAt,
+    createdAt:
+      project.createdAt instanceof Timestamp
+        ? project.createdAt.toDate().toISOString()
+        : project.createdAt,
+    updatedAt:
+      project.updatedAt instanceof Timestamp
+        ? project.updatedAt.toDate().toISOString()
+        : project.updatedAt,
+    publishedAt:
+      project.publishedAt instanceof Timestamp
+        ? project.publishedAt.toDate().toISOString()
+        : project.publishedAt,
+    closedAt:
+      project.closedAt instanceof Timestamp
+        ? project.closedAt.toDate().toISOString()
+        : project.closedAt,
     timeline: {
       ...project.timeline,
-      startDate: project.timeline?.startDate instanceof Timestamp 
-        ? project.timeline.startDate.toDate().toISOString() 
-        : project.timeline?.startDate instanceof Date
-        ? project.timeline.startDate.toISOString()
-        : project.timeline?.startDate,
-      endDate: project.timeline?.endDate instanceof Timestamp 
-        ? project.timeline.endDate.toDate().toISOString() 
-        : project.timeline?.endDate instanceof Date
-        ? project.timeline.endDate.toISOString()
-        : project.timeline?.endDate,
+      startDate:
+        project.timeline?.startDate instanceof Timestamp
+          ? project.timeline.startDate.toDate().toISOString()
+          : project.timeline?.startDate instanceof Date
+          ? project.timeline.startDate.toISOString()
+          : project.timeline?.startDate,
+      endDate:
+        project.timeline?.endDate instanceof Timestamp
+          ? project.timeline.endDate.toDate().toISOString()
+          : project.timeline?.endDate instanceof Date
+          ? project.timeline.endDate.toISOString()
+          : project.timeline?.endDate,
     },
-    milestones: project.milestones?.map((milestone: any) => ({
-      ...milestone,
-      dueDate: milestone.dueDate instanceof Timestamp 
-        ? milestone.dueDate.toDate().toISOString() 
-        : milestone.dueDate instanceof Date
-        ? milestone.dueDate.toISOString()
-        : milestone.dueDate,
-    })) || [],
+    milestones:
+      project.milestones?.map((milestone: any) => ({
+        ...milestone,
+        dueDate:
+          milestone.dueDate instanceof Timestamp
+            ? milestone.dueDate.toDate().toISOString()
+            : milestone.dueDate instanceof Date
+            ? milestone.dueDate.toISOString()
+            : milestone.dueDate,
+      })) || [],
     requirements: {
       ...project.requirements,
-      attachments: project.requirements?.attachments?.map((attachment: any) => ({
-        ...attachment,
-        uploadedAt: attachment.uploadedAt instanceof Timestamp
-          ? attachment.uploadedAt.toDate().toISOString()
-          : attachment.uploadedAt instanceof Date
-          ? attachment.uploadedAt.toISOString()
-          : attachment.uploadedAt,
-      })) || [],
+      attachments:
+        project.requirements?.attachments?.map((attachment: any) => ({
+          ...attachment,
+          uploadedAt:
+            attachment.uploadedAt instanceof Timestamp
+              ? attachment.uploadedAt.toDate().toISOString()
+              : attachment.uploadedAt instanceof Date
+              ? attachment.uploadedAt.toISOString()
+              : attachment.uploadedAt,
+        })) || [],
     },
-  }
-}
+  };
+};
 
 // Helper function to convert string dates to Timestamps for Firestore storage
 const deserializeProjectForStorage = (project: any): any => {
   // Convert project for Firestore storage
-  const result = { ...project }
-  
+  const result = { ...project };
+
   // Convert timeline dates to Timestamps if they're strings or Date objects
   if (result.timeline) {
-    if (typeof result.timeline.startDate === 'string') {
-      result.timeline.startDate = Timestamp.fromDate(new Date(result.timeline.startDate))
+    if (typeof result.timeline.startDate === "string") {
+      result.timeline.startDate = Timestamp.fromDate(
+        new Date(result.timeline.startDate)
+      );
     } else if (result.timeline.startDate instanceof Date) {
-      result.timeline.startDate = Timestamp.fromDate(result.timeline.startDate)
+      result.timeline.startDate = Timestamp.fromDate(result.timeline.startDate);
     }
-    
-    if (typeof result.timeline.endDate === 'string') {
-      result.timeline.endDate = Timestamp.fromDate(new Date(result.timeline.endDate))
+
+    if (typeof result.timeline.endDate === "string") {
+      result.timeline.endDate = Timestamp.fromDate(
+        new Date(result.timeline.endDate)
+      );
     } else if (result.timeline.endDate instanceof Date) {
-      result.timeline.endDate = Timestamp.fromDate(result.timeline.endDate)
+      result.timeline.endDate = Timestamp.fromDate(result.timeline.endDate);
     }
   }
-  
+
   // Convert milestone dates to Timestamps
   if (result.milestones) {
     result.milestones = result.milestones.map((milestone: any) => ({
       ...milestone,
-      dueDate: typeof milestone.dueDate === 'string' 
-        ? Timestamp.fromDate(new Date(milestone.dueDate))
-        : milestone.dueDate instanceof Date
-        ? Timestamp.fromDate(milestone.dueDate)
-        : milestone.dueDate,
-    }))
+      dueDate:
+        typeof milestone.dueDate === "string"
+          ? Timestamp.fromDate(new Date(milestone.dueDate))
+          : milestone.dueDate instanceof Date
+          ? Timestamp.fromDate(milestone.dueDate)
+          : milestone.dueDate,
+    }));
   }
-  
+
   // Convert attachment dates to Timestamps
   if (result.requirements?.attachments) {
-    result.requirements.attachments = result.requirements.attachments.map((attachment: any) => ({
-      ...attachment,
-      uploadedAt: typeof attachment.uploadedAt === 'string'
-        ? Timestamp.fromDate(new Date(attachment.uploadedAt))
-        : attachment.uploadedAt instanceof Date
-        ? Timestamp.fromDate(attachment.uploadedAt)
-        : attachment.uploadedAt,
-    }))
+    result.requirements.attachments = result.requirements.attachments.map(
+      (attachment: any) => ({
+        ...attachment,
+        uploadedAt:
+          typeof attachment.uploadedAt === "string"
+            ? Timestamp.fromDate(new Date(attachment.uploadedAt))
+            : attachment.uploadedAt instanceof Date
+            ? Timestamp.fromDate(attachment.uploadedAt)
+            : attachment.uploadedAt,
+      })
+    );
   }
-  
+
   // Return the deserialized project
-  return result
-}
+  return result;
+};
 
 // Create Firebase API using RTK Query with fakeBaseQuery
 export const firebaseApi = createApi({
-  reducerPath: 'firebaseApi',
+  reducerPath: "firebaseApi",
   baseQuery: fakeBaseQuery(),
-  tagTypes: ['User', 'Project', 'Proposal', 'Contract'],
+  tagTypes: [
+    "User",
+    "Project",
+    "Proposal",
+    "Contract",
+    "Payment",
+    "Conversation",
+    "Review",
+  ],
   endpoints: (builder) => ({
     // Auth endpoints
     login: builder.mutation<User, LoginData>({
       queryFn: async ({ email, password }) => {
         try {
-          const userCredential = await signInWithEmailAndPassword(auth, email, password)
-          const firebaseUser = userCredential.user
-          
+          const userCredential = await signInWithEmailAndPassword(
+            auth,
+            email,
+            password
+          );
+          const firebaseUser = userCredential.user;
+
           // Get user data from Firestore
-          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid))
+          const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
           if (!userDoc.exists()) {
-            throw new Error('User profile not found')
+            throw new Error("User profile not found");
           }
-          
-          const userData = userDoc.data()
-          return { data: serializeUser(userData) }
+
+          const userData = userDoc.data();
+          return { data: serializeUser(userData) };
         } catch (error: any) {
-          return { error: { status: 'CUSTOM_ERROR', error: error.message } }
+          return { error: { status: "CUSTOM_ERROR", error: error.message } };
         }
       },
-      invalidatesTags: ['User'],
+      invalidatesTags: ["User"],
     }),
 
     signup: builder.mutation<User, SignupData>({
@@ -251,22 +289,22 @@ export const firebaseApi = createApi({
         try {
           // Create Firebase user
           const userCredential = await createUserWithEmailAndPassword(
-            auth, 
-            signupData.email, 
+            auth,
+            signupData.email,
             signupData.password
-          )
-          const firebaseUser = userCredential.user
-          
+          );
+          const firebaseUser = userCredential.user;
+
           // Update Firebase profile
           await updateProfile(firebaseUser, {
-            displayName: `${signupData.firstname} ${signupData.lastname}`
-          })
-          
+            displayName: `${signupData.firstname} ${signupData.lastname}`,
+          });
+
           // Send email verification
-          await sendEmailVerification(firebaseUser)
-          
+          await sendEmailVerification(firebaseUser);
+
           // Create user document in Firestore
-          const now = new Date().toISOString()
+          const now = new Date().toISOString();
           // Create user data with string timestamps for Redux
           const userData: User = {
             userId: firebaseUser.uid,
@@ -275,27 +313,30 @@ export const firebaseApi = createApi({
             firstname: signupData.firstname,
             lastname: signupData.lastname,
             displayName: `${signupData.firstname} ${signupData.lastname}`,
-            role: (signupData.userType as string) === 'freelancer' ? 'freelancer' : 'client',
-            title: signupData.title || '',
-            overview: signupData.overview || '',
-            hourRate: '$ 0',
-            photoURL: firebaseUser.photoURL || '',
+            role:
+              (signupData.userType as string) === "freelancer"
+                ? "freelancer"
+                : "client",
+            title: signupData.title || "",
+            overview: signupData.overview || "",
+            hourRate: "$ 0",
+            photoURL: firebaseUser.photoURL || "",
             isActive: true,
             isVerified: firebaseUser.emailVerified,
-            accountStatus: 'pending',
+            accountStatus: "pending",
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             lastLoginAt: new Date().toISOString(),
             about: {
-              streetAddress: '',
-              city: '',
-              state: '',
-              country: '',
-              zipCode: '',
-              tel: '',
-              dob: '',
-              profileUrl: '',
-              downloadLink: ''
+              streetAddress: "",
+              city: "",
+              state: "",
+              country: "",
+              zipCode: "",
+              tel: "",
+              dob: "",
+              profileUrl: "",
+              downloadLink: "",
             },
             skills: [],
             specialties: [],
@@ -312,87 +353,88 @@ export const firebaseApi = createApi({
               totalReviews: 0,
               responseRate: 0,
               onTimeDelivery: 0,
-              repeatClients: 0
+              repeatClients: 0,
             },
             preferences: {
-              timezone: 'UTC',
-              language: 'en',
-              currency: 'USD',
+              timezone: "UTC",
+              language: "en",
+              currency: "USD",
               emailNotifications: true,
               pushNotifications: true,
-              availability: 'available'
-            }
-          }
-          
+              availability: "available",
+            },
+          };
+
           // Create Firestore version with Firestore Timestamps
           const firestoreUserData = {
             ...userData,
             createdAt: Timestamp.now(),
             updatedAt: Timestamp.now(),
             lastLoginAt: Timestamp.now(),
-          }
-          
-          await setDoc(doc(db, 'users', firebaseUser.uid), firestoreUserData)
-          
-          return { data: userData }
+          };
+
+          await setDoc(doc(db, "users", firebaseUser.uid), firestoreUserData);
+
+          return { data: userData };
         } catch (error: any) {
-          return { error: { status: 'CUSTOM_ERROR', error: error.message } }
+          return { error: { status: "CUSTOM_ERROR", error: error.message } };
         }
       },
-      invalidatesTags: ['User'],
+      invalidatesTags: ["User"],
     }),
 
-    googleAuth: builder.mutation<User, { mode: 'login' | 'signup' }>({
+    googleAuth: builder.mutation<User, { mode: "login" | "signup" }>({
       queryFn: async ({ mode }) => {
         try {
-          const provider = new GoogleAuthProvider()
-          
+          const provider = new GoogleAuthProvider();
+
           // Add popup configuration to handle CORP policy issues
           provider.setCustomParameters({
-            prompt: 'select_account'
-          })
-          
-          const userCredential = await signInWithPopup(auth, provider)
-          const firebaseUser = userCredential.user
-          
+            prompt: "select_account",
+          });
+
+          const userCredential = await signInWithPopup(auth, provider);
+          const firebaseUser = userCredential.user;
+
           // Check if user exists in Firestore
-          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid))
-          
+          const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
+
           if (userDoc.exists()) {
             // Existing user - login
-            const userData = userDoc.data()
-            return { data: serializeUser(userData) }
-          } else if (mode === 'signup') {
+            const userData = userDoc.data();
+            return { data: serializeUser(userData) };
+          } else if (mode === "signup") {
             // New user - create profile
-            const now = new Date().toISOString()
+            const now = new Date().toISOString();
             const userData: User = {
               userId: firebaseUser.uid,
               email: firebaseUser.email!,
               emailVerified: firebaseUser.emailVerified,
-              firstname: firebaseUser.displayName?.split(' ')[0] || '',
-              lastname: firebaseUser.displayName?.split(' ').slice(1).join(' ') || '',
-              displayName: firebaseUser.displayName || '',
-              role: 'client', // Default role, can be updated later
-              title: '',
-              overview: '',
-              hourRate: '$ 0',
-              photoURL: firebaseUser.photoURL || '',
+              firstname: firebaseUser.displayName?.split(" ")[0] || "",
+              lastname:
+                firebaseUser.displayName?.split(" ").slice(1).join(" ") || "",
+              displayName: firebaseUser.displayName || "",
+              role: "client", // Default role, can be updated later
+              title: "",
+              overview: "",
+              hourRate: "$ 0",
+              photoURL: firebaseUser.photoURL || "",
               isActive: true,
               isVerified: true, // Google users are pre-verified
-              accountStatus: 'active',
+              accountStatus: "active",
               createdAt: now,
               updatedAt: now,
               lastLoginAt: now,
               about: {
-                streetAddress: '',
-                city: '',
-                state: '',
-                country: '',
-                zipCode: '',
-                tel: '',
-                dob: '',
-                profileUrl: '',
-                downloadLink: ''
+                streetAddress: "",
+                city: "",
+                state: "",
+                country: "",
+                zipCode: "",
+                tel: "",
+                dob: "",
+                profileUrl: "",
+                downloadLink: "",
               },
               skills: [],
               specialties: [],
@@ -409,147 +451,180 @@ export const firebaseApi = createApi({
                 totalReviews: 0,
                 responseRate: 0,
                 onTimeDelivery: 0,
-              repeatClients: 0
+                repeatClients: 0,
               },
               preferences: {
-                timezone: 'UTC',
-                language: 'en',
-                currency: 'USD',
+                timezone: "UTC",
+                language: "en",
+                currency: "USD",
                 emailNotifications: true,
                 pushNotifications: true,
-                availability: 'available'
-              }
-            }
-            
+                availability: "available",
+              },
+            };
+
             // For Firestore, create version with Firestore Timestamps
             const firestoreUserData = {
               ...userData,
               createdAt: Timestamp.now(),
               updatedAt: Timestamp.now(),
               lastLoginAt: Timestamp.now(),
-            }
-            
-            await setDoc(doc(db, 'users', firebaseUser.uid), firestoreUserData)
-            return { data: userData }
+            };
+
+            await setDoc(doc(db, "users", firebaseUser.uid), firestoreUserData);
+            return { data: userData };
           } else {
-            throw new Error('User not found. Please sign up first.')
+            throw new Error("User not found. Please sign up first.");
           }
         } catch (error: any) {
-          console.error('Google Auth Error:', error)
-          
+          console.error("Google Auth Error:", error);
+
           // Handle specific Google Auth errors
-          if (error.code === 'auth/popup-closed-by-user') {
-            return { error: { status: 'CUSTOM_ERROR', error: 'Authentication cancelled. Please try again.' } }
-          } else if (error.code === 'auth/popup-blocked') {
-            return { error: { status: 'CUSTOM_ERROR', error: 'Popup blocked. Please allow popups and try again.' } }
-          } else if (error.message?.includes('Cross-Origin-Opener-Policy')) {
-            return { error: { status: 'CUSTOM_ERROR', error: 'Browser security settings are blocking authentication. Please try again or use a different browser.' } }
-          } else if (error.code === 'auth/cancelled-popup-request') {
-            return { error: { status: 'CUSTOM_ERROR', error: 'Authentication request was cancelled. Please try again.' } }
+          if (error.code === "auth/popup-closed-by-user") {
+            return {
+              error: {
+                status: "CUSTOM_ERROR",
+                error: "Authentication cancelled. Please try again.",
+              },
+            };
+          } else if (error.code === "auth/popup-blocked") {
+            return {
+              error: {
+                status: "CUSTOM_ERROR",
+                error: "Popup blocked. Please allow popups and try again.",
+              },
+            };
+          } else if (error.message?.includes("Cross-Origin-Opener-Policy")) {
+            return {
+              error: {
+                status: "CUSTOM_ERROR",
+                error:
+                  "Browser security settings are blocking authentication. Please try again or use a different browser.",
+              },
+            };
+          } else if (error.code === "auth/cancelled-popup-request") {
+            return {
+              error: {
+                status: "CUSTOM_ERROR",
+                error:
+                  "Authentication request was cancelled. Please try again.",
+              },
+            };
           }
-          
-          return { error: { status: 'CUSTOM_ERROR', error: error.message } }
+
+          return { error: { status: "CUSTOM_ERROR", error: error.message } };
         }
       },
-      invalidatesTags: ['User'],
+      invalidatesTags: ["User"],
     }),
 
     logout: builder.mutation<{ success: boolean }, void>({
       queryFn: async () => {
         try {
-          await signOut(auth)
-          return { data: { success: true } }
+          await signOut(auth);
+          return { data: { success: true } };
         } catch (error: any) {
-          return { error: { status: 'CUSTOM_ERROR', error: error.message } }
+          return { error: { status: "CUSTOM_ERROR", error: error.message } };
         }
       },
-      invalidatesTags: ['User'],
+      invalidatesTags: ["User"],
     }),
 
     resetPassword: builder.mutation<void, { email: string }>({
       queryFn: async ({ email }) => {
         try {
-          await sendPasswordResetEmail(auth, email)
-          return { data: undefined }
+          await sendPasswordResetEmail(auth, email);
+          return { data: undefined };
         } catch (error: any) {
-          return { error: { status: 'CUSTOM_ERROR', error: error.message } }
+          return { error: { status: "CUSTOM_ERROR", error: error.message } };
         }
       },
     }),
 
-    updateSignupData: builder.mutation<User, { userId: string; data: Partial<SignupData> }>({
+    updateSignupData: builder.mutation<
+      User,
+      { userId: string; data: Partial<SignupData> }
+    >({
       queryFn: async ({ userId, data }) => {
         try {
-          const userRef = doc(db, 'users', userId)
-          const userDoc = await getDoc(userRef)
-          
+          const userRef = doc(db, "users", userId);
+          const userDoc = await getDoc(userRef);
+
           if (!userDoc.exists()) {
-            return { error: { status: 'CUSTOM_ERROR', error: 'User not found' } }
+            return {
+              error: { status: "CUSTOM_ERROR", error: "User not found" },
+            };
           }
-          
-          const currentData = userDoc.data() as User
-          
+
+          const currentData = userDoc.data() as User;
+
           // Transform signup data to user format
           const updateData: Partial<User> = {
-            updatedAt: new Date().toISOString()
-          }
-          
+            updatedAt: new Date().toISOString(),
+          };
+
           // Map properties correctly
-          if (data.firstname) updateData.firstname = data.firstname
-          if (data.lastname) updateData.lastname = data.lastname
-          if (data.title) updateData.title = data.title
-          if (data.overview) updateData.overview = data.overview
-          if ((data as any).skills) updateData.skills = (data as any).skills.split(',').map((skill: string, index: number) => ({
-            id: `skill-${index}`,
-            text: skill.trim(),
-            level: 'intermediate' as const,
-            yearsOfExperience: 1
-          }))
-          
+          if (data.firstname) updateData.firstname = data.firstname;
+          if (data.lastname) updateData.lastname = data.lastname;
+          if (data.title) updateData.title = data.title;
+          if (data.overview) updateData.overview = data.overview;
+          if ((data as any).skills)
+            updateData.skills = (data as any).skills
+              .split(",")
+              .map((skill: string, index: number) => ({
+                id: `skill-${index}`,
+                text: skill.trim(),
+                level: "intermediate" as const,
+                yearsOfExperience: 1,
+              }));
+
           // Create Firestore update with Firestore Timestamp
           const firestoreUpdateData = {
             ...updateData,
-            updatedAt: Timestamp.now()
-          }
-          
-          await updateDoc(userRef, firestoreUpdateData)
-          
-          const updatedDoc = await getDoc(userRef)
-          const userData = updatedDoc.data() as any
-          
+            updatedAt: Timestamp.now(),
+          };
+
+          await updateDoc(userRef, firestoreUpdateData);
+
+          const updatedDoc = await getDoc(userRef);
+          const userData = updatedDoc.data() as any;
+
           // Serialize the user data before returning to Redux
-          return { data: serializeUser(userData) }
+          return { data: serializeUser(userData) };
         } catch (error: any) {
-          return { error: { status: 'CUSTOM_ERROR', error: error.message } }
+          return { error: { status: "CUSTOM_ERROR", error: error.message } };
         }
       },
-      invalidatesTags: ['User'],
+      invalidatesTags: ["User"],
     }),
 
     // Project endpoints
-    getProjects: builder.query<{ projects: Project[], lastDoc: any }, { 
-      limit?: number; 
-      status?: string; 
-      skills?: string[];
-      categories?: string[];
-      experienceLevel?: string;
-      minBudget?: number;
-      maxBudget?: number;
-      freelancerId?: string;
-      matchFreelancerSkills?: boolean;
-      lastDoc?: any 
-    }>({
-      queryFn: async ({ 
-        limit: queryLimit = 10, 
-        status = 'active', 
-        skills, 
+    getProjects: builder.query<
+      { projects: Project[]; lastDoc: any },
+      {
+        limit?: number;
+        status?: string;
+        skills?: string[];
+        categories?: string[];
+        experienceLevel?: string;
+        minBudget?: number;
+        maxBudget?: number;
+        freelancerId?: string;
+        matchFreelancerSkills?: boolean;
+        lastDoc?: any;
+      }
+    >({
+      queryFn: async ({
+        limit: queryLimit = 10,
+        status = "active",
+        skills,
         categories,
         experienceLevel,
         minBudget,
         maxBudget,
         freelancerId,
         matchFreelancerSkills = false,
-        lastDoc 
+        lastDoc,
       }) => {
         try {
           // Start projects query with the provided parameters
@@ -557,561 +632,674 @@ export const firebaseApi = createApi({
           // Start with base query - always filter by active status for public listings
           // This ensures we only show projects that are open for proposals
           let q = query(
-            collection(db, 'projects'),
-            where('status', '==', status),
-            orderBy('createdAt', 'desc'),
+            collection(db, "projects"),
+            where("status", "==", status),
+            orderBy("createdAt", "desc"),
             limit(queryLimit)
-          )
-          
+          );
+
           // Apply additional filters
           if (categories && categories.length > 0) {
             // Firebase doesn't support multiple 'where' clauses on different fields
             // with array-contains-any, so we'll filter by category in memory if needed
-            q = query(q, where('category', 'in', categories))
+            q = query(q, where("category", "in", categories));
           }
-          
+
           if (skills && skills.length > 0 && !matchFreelancerSkills) {
-            q = query(q, where('requirements.skills', 'array-contains-any', skills))
+            q = query(
+              q,
+              where("requirements.skills", "array-contains-any", skills)
+            );
           }
-          
+
           // Experience level is no longer part of the initial query filter
           // It will be applied as a client-side filter instead
-          
+
           if (lastDoc) {
             // If lastDoc is a string (document ID), retrieve the actual DocumentSnapshot from cache
-            const actualLastDoc = typeof lastDoc === 'string' ? documentCache.get(lastDoc) : lastDoc;
+            const actualLastDoc =
+              typeof lastDoc === "string"
+                ? documentCache.get(lastDoc)
+                : lastDoc;
             if (actualLastDoc) {
               q = query(q, startAfter(actualLastDoc));
             }
           }
-          
+
           // Fetch freelancer data if we need to match by freelancer skills
           let freelancerData = null;
           if (freelancerId && matchFreelancerSkills) {
-            const userDoc = await getDoc(doc(db, 'users', freelancerId));
+            const userDoc = await getDoc(doc(db, "users", freelancerId));
             if (userDoc.exists()) {
               freelancerData = userDoc.data();
               // Freelancer data fetched successfully
             }
           }
-          
+
           // Execute query
-          const querySnapshot = await getDocs(q)
+          const querySnapshot = await getDocs(q);
           // Query execution completed
-          
+
           // Get projects and apply any in-memory filtering
-          let projects = querySnapshot.docs.map(doc => {
-            const data = doc.data()
+          let projects = querySnapshot.docs.map((doc) => {
+            const data = doc.data();
             const project = {
               projectId: doc.id,
-              ...data
-            } as Project
-            
+              ...data,
+            } as Project;
+
             // Serialize project for Redux
-            return serializeProject(project)
-          })
-          
+            return serializeProject(project);
+          });
+
           // Apply budget filtering in memory since Firebase doesn't easily support
           // complex filtering on nested fields
           if (minBudget !== undefined || maxBudget !== undefined) {
-            projects = projects.filter(project => {
-              const projectBudget = project.budget.type === 'fixed' 
-                ? project.budget.amount 
-                : project.budget.maxAmount;
-                
-              const meetsMinBudget = minBudget !== undefined ? projectBudget >= minBudget : true;
-              const meetsMaxBudget = maxBudget !== undefined ? projectBudget <= maxBudget : true;
-              
+            projects = projects.filter((project) => {
+              const projectBudget =
+                project.budget.type === "fixed"
+                  ? project.budget.amount
+                  : project.budget.maxAmount;
+
+              const meetsMinBudget =
+                minBudget !== undefined ? projectBudget >= minBudget : true;
+              const meetsMaxBudget =
+                maxBudget !== undefined ? projectBudget <= maxBudget : true;
+
               return meetsMinBudget && meetsMaxBudget;
             });
           }
-          
+
           // Filter by freelancer skills if requested
           if (freelancerId && matchFreelancerSkills && freelancerData) {
             // First, try to match projects based on skills/specialties
-            const matchedProjects = projects.filter(project => {
+            const matchedProjects = projects.filter((project) => {
               // Extract freelancer skills and specialties
-              const freelancerSkills = freelancerData.skills?.map((s: any) => s.text.toLowerCase()) || [];
-              const freelancerSpecialties = freelancerData.specialties?.map((s: string) => s.toLowerCase()) || [];
-              
+              const freelancerSkills =
+                freelancerData.skills?.map((s: any) => s.text.toLowerCase()) ||
+                [];
+              const freelancerSpecialties =
+                freelancerData.specialties?.map((s: string) =>
+                  s.toLowerCase()
+                ) || [];
+
               // Check if project skills match freelancer skills or specialties
-              const projectSkills = project.requirements?.skills?.map(s => s.toLowerCase()) || [];
+              const projectSkills =
+                project.requirements?.skills?.map((s) => s.toLowerCase()) || [];
               const projectCategory = project.category?.toLowerCase();
               const projectSubcategory = project.subcategory?.toLowerCase();
-              
+
               // Calculate matches:
               // 1. Check if any project skills match freelancer skills (more relaxed matching)
-              const hasSkillMatch = projectSkills.some(skill => 
-                freelancerSkills.some((fSkill: string) => 
-                  fSkill.includes(skill) || skill.includes(fSkill)
+              const hasSkillMatch = projectSkills.some((skill) =>
+                freelancerSkills.some(
+                  (fSkill: string) =>
+                    fSkill.includes(skill) || skill.includes(fSkill)
                 )
               );
-              
+
               // 2. Check if project category/subcategory matches freelancer specialties
               // More relaxed matching using partial matches
-              const hasSpecialtyMatch = 
-                (projectCategory && freelancerSpecialties.some((specialty: string) => 
-                  specialty.includes(projectCategory) || 
-                  projectCategory.includes(specialty))) || 
-                (projectSubcategory && freelancerSpecialties.some((specialty: string) => 
-                  specialty.includes(projectSubcategory) || 
-                  projectSubcategory.includes(specialty)));
-              
+              const hasSpecialtyMatch =
+                (projectCategory &&
+                  freelancerSpecialties.some(
+                    (specialty: string) =>
+                      specialty.includes(projectCategory) ||
+                      projectCategory.includes(specialty)
+                  )) ||
+                (projectSubcategory &&
+                  freelancerSpecialties.some(
+                    (specialty: string) =>
+                      specialty.includes(projectSubcategory) ||
+                      projectSubcategory.includes(specialty)
+                  ));
+
               // 3. Check experience level match - instead of filtering, use it for scoring
-              const requiredLevel = project.requirements?.experienceLevel || 'entry';
+              const requiredLevel =
+                project.requirements?.experienceLevel || "entry";
               const freelancerLevel = determineFreelancerLevel(freelancerData);
-              const hasLevelMatch = 
-                requiredLevel === 'entry' || 
-                (requiredLevel === 'intermediate' && (freelancerLevel === 'intermediate' || freelancerLevel === 'expert')) ||
-                (requiredLevel === 'expert' && freelancerLevel === 'expert');
-              
+              const hasLevelMatch =
+                requiredLevel === "entry" ||
+                (requiredLevel === "intermediate" &&
+                  (freelancerLevel === "intermediate" ||
+                    freelancerLevel === "expert")) ||
+                (requiredLevel === "expert" && freelancerLevel === "expert");
+
               // Consider a project a good match if it matches skills OR specialties
               // We no longer filter by experience level, just skill/specialty match
               return hasSkillMatch || hasSpecialtyMatch;
             });
-            
+
             // If we found skill or specialty matches, use them to boost those projects to the top
             // but don't exclude non-matching projects entirely
             if (matchedProjects.length > 0) {
               // Sort projects so matched ones appear first
               const nonMatchedProjects = projects.filter(
-                project => !matchedProjects.some(p => p.projectId === project.projectId)
+                (project) =>
+                  !matchedProjects.some(
+                    (p) => p.projectId === project.projectId
+                  )
               );
-              
+
               // Combine matched projects (first) with non-matched projects (after)
               projects = [...matchedProjects, ...nonMatchedProjects];
             }
-            
+
             // Add a relevance score to each project for better sorting
-            projects = projects.map(project => {
-              const requiredLevel = project.requirements?.experienceLevel || 'entry';
+            projects = projects.map((project) => {
+              const requiredLevel =
+                project.requirements?.experienceLevel || "entry";
               const freelancerLevel = determineFreelancerLevel(freelancerData);
-              
+
               // Check if level matches (freelancer meets or exceeds required level)
-              const hasLevelMatch = 
-                requiredLevel === 'entry' || 
-                (requiredLevel === 'intermediate' && (freelancerLevel === 'intermediate' || freelancerLevel === 'expert')) ||
-                (requiredLevel === 'expert' && freelancerLevel === 'expert');
-              
+              const hasLevelMatch =
+                requiredLevel === "entry" ||
+                (requiredLevel === "intermediate" &&
+                  (freelancerLevel === "intermediate" ||
+                    freelancerLevel === "expert")) ||
+                (requiredLevel === "expert" && freelancerLevel === "expert");
+
               // Calculate relevance score (higher is better)
-              const relevanceScore = (hasLevelMatch ? 100 : 0) + 
-                (matchedProjects.some(p => p.projectId === project.projectId) ? 200 : 0);
-              
+              const relevanceScore =
+                (hasLevelMatch ? 100 : 0) +
+                (matchedProjects.some((p) => p.projectId === project.projectId)
+                  ? 200
+                  : 0);
+
               return {
                 ...project,
-                relevanceScore
+                relevanceScore,
               };
             });
           }
-          
+
           // Filter out projects that already have a hired freelancer
-          projects = projects.filter(project => !project.hiredFreelancerId);
-          
+          projects = projects.filter((project) => !project.hiredFreelancerId);
+
           // Project filtering completed
-          
+
           // Helper function to determine freelancer experience level based on profile data
-          function determineFreelancerLevel(freelancerData: any): 'entry' | 'intermediate' | 'expert' {
+          function determineFreelancerLevel(
+            freelancerData: any
+          ): "entry" | "intermediate" | "expert" {
             // Check if the freelancer has explicitly set their experience level
             if (freelancerData.experienceLevel) {
               return freelancerData.experienceLevel;
             }
-            
+
             // Otherwise, calculate based on years of experience or completed projects
             const yearsOfExperience = freelancerData.yearsOfExperience || 0;
             const completedProjects = freelancerData.completedProjects || 0;
             const rating = freelancerData.rating || 0;
-            
+
             // Simple algorithm to determine level
-            if (yearsOfExperience > 5 || completedProjects > 20 || rating > 4.5) {
-              return 'expert';
-            } else if (yearsOfExperience > 2 || completedProjects > 5 || rating > 4.0) {
-              return 'intermediate';
+            if (
+              yearsOfExperience > 5 ||
+              completedProjects > 20 ||
+              rating > 4.5
+            ) {
+              return "expert";
+            } else if (
+              yearsOfExperience > 2 ||
+              completedProjects > 5 ||
+              rating > 4.0
+            ) {
+              return "intermediate";
             } else {
-              return 'entry';
+              return "entry";
             }
           }
-          
+
           // Get the last document for pagination
-          const lastVisible = querySnapshot.docs.length > 0 ? querySnapshot.docs[querySnapshot.docs.length - 1] : null;
-          
+          const lastVisible =
+            querySnapshot.docs.length > 0
+              ? querySnapshot.docs[querySnapshot.docs.length - 1]
+              : null;
+
           // We need to make lastDoc serializable for Redux
           // Instead of returning the DocumentSnapshot directly, store it in a cache and return a reference
           // We'll use the document ID as a reference
           const lastDocId = lastVisible ? lastVisible.id : null;
-          
+
           // Store the actual DocumentSnapshot in a module-level cache
           if (lastVisible) {
             // Add to documentCache
             documentCache.set(lastDocId, lastVisible);
-            
+
             // Clean up the cache occasionally to prevent memory leaks
             cleanupDocumentCache();
           }
-          
-          return { 
-            data: { 
+
+          return {
+            data: {
               projects: projects,
               // Return a serializable reference instead of the actual DocumentSnapshot
-              lastDoc: lastDocId
-            }
-          }
+              lastDoc: lastDocId,
+            },
+          };
         } catch (error: any) {
-          return { error: { status: 'CUSTOM_ERROR', error: error.message } }
+          return { error: { status: "CUSTOM_ERROR", error: error.message } };
         }
       },
-      providesTags: ['Project'],
+      providesTags: ["Project"],
     }),
 
     getProject: builder.query<Project, string>({
       queryFn: async (projectId) => {
         try {
-          const projectDoc = await getDoc(doc(db, 'projects', projectId))
+          const projectDoc = await getDoc(doc(db, "projects", projectId));
           if (!projectDoc.exists()) {
-            throw new Error('Project not found')
+            throw new Error("Project not found");
           }
-          
-          const data = projectDoc.data()
+
+          const data = projectDoc.data();
           const project = {
             projectId: projectDoc.id,
-            ...data
-          } as Project
-          
+            ...data,
+          } as Project;
+
           // Serialize the project before returning it to Redux
-          return { data: serializeProject(project) }
+          return { data: serializeProject(project) };
         } catch (error: any) {
-          return { error: { status: 'CUSTOM_ERROR', error: error.message } }
+          return { error: { status: "CUSTOM_ERROR", error: error.message } };
         }
       },
-      providesTags: ['Project'],
+      providesTags: ["Project"],
     }),
 
-    getProjectsByClient: builder.query<Project[], { 
-      clientId: string;
-      status?: string;
-      limit?: number;
-    }>({
+    getProjectsByClient: builder.query<
+      Project[],
+      {
+        clientId: string;
+        status?: string;
+        limit?: number;
+      }
+    >({
       queryFn: async ({ clientId, status, limit: queryLimit = 50 }) => {
         try {
           // Starting client projects query
-          
+
           let q = query(
-            collection(db, 'projects'),
-            where('clientId', '==', clientId),
+            collection(db, "projects"),
+            where("clientId", "==", clientId),
             limit(queryLimit)
-          )
-          
+          );
+
           if (status) {
             q = query(
-              collection(db, 'projects'),
-              where('clientId', '==', clientId),
-              where('status', '==', status),
+              collection(db, "projects"),
+              where("clientId", "==", clientId),
+              where("status", "==", status),
               limit(queryLimit)
-            )
+            );
             // Added status filter to query
           }
-          
+
           // Execute Firestore query
-          const querySnapshot = await getDocs(q)
-          
+          const querySnapshot = await getDocs(q);
+
           const projects = querySnapshot.docs.map((doc, index) => {
-            const data = doc.data()
-            console.log(`9.${index + 1}. Project data:`, { 
-              id: doc.id, 
+            const data = doc.data();
+            console.log(`9.${index + 1}. Project data:`, {
+              id: doc.id,
               clientId: data.clientId,
               title: data.title,
               status: data.status,
-              createdAt: data.createdAt 
-            })
+              createdAt: data.createdAt,
+            });
             const project = {
               projectId: doc.id,
-              ...data
-            } as Project
-            
+              ...data,
+            } as Project;
+
             // Serialize each project before returning to Redux
-            return serializeProject(project)
-          })
-          
+            return serializeProject(project);
+          });
+
           // Sort by createdAt in memory (most recent first)
           projects.sort((a, b) => {
             // Handle different timestamp formats safely
             let aTime = 0;
             let bTime = 0;
-            
+
             if (a.createdAt) {
-              if (typeof a.createdAt === 'string') {
+              if (typeof a.createdAt === "string") {
                 aTime = new Date(a.createdAt).getTime();
-              } else if (typeof a.createdAt === 'object' && a.createdAt !== null && 'seconds' in a.createdAt) {
+              } else if (
+                typeof a.createdAt === "object" &&
+                a.createdAt !== null &&
+                "seconds" in a.createdAt
+              ) {
                 // Firestore timestamp object
                 aTime = (a.createdAt as { seconds: number }).seconds * 1000;
               }
             }
-            
+
             if (b.createdAt) {
-              if (typeof b.createdAt === 'string') {
+              if (typeof b.createdAt === "string") {
                 bTime = new Date(b.createdAt).getTime();
-              } else if (typeof b.createdAt === 'object' && b.createdAt !== null && 'seconds' in b.createdAt) {
+              } else if (
+                typeof b.createdAt === "object" &&
+                b.createdAt !== null &&
+                "seconds" in b.createdAt
+              ) {
                 // Firestore timestamp object
                 bTime = (b.createdAt as { seconds: number }).seconds * 1000;
               }
             }
-            return bTime - aTime
-          })
-          
+            return bTime - aTime;
+          });
+
           // Return projects to Redux
-          return { data: projects }
+          return { data: projects };
         } catch (error: any) {
-          console.error("=== FIREBASE QUERY ERROR ===")
-          console.error("Error details:", error)
-          console.error("Error message:", error.message)
-          console.error("Error code:", error.code)
-          console.error("============================")
-          return { error: { status: 'CUSTOM_ERROR', error: error.message } }
+          console.error("=== FIREBASE QUERY ERROR ===");
+          console.error("Error details:", error);
+          console.error("Error message:", error.message);
+          console.error("Error code:", error.code);
+          console.error("============================");
+          return { error: { status: "CUSTOM_ERROR", error: error.message } };
         }
       },
-      providesTags: ['Project'],
+      providesTags: ["Project"],
     }),
 
-    createProject: builder.mutation<Project, Omit<Project, 'projectId' | 'createdAt' | 'updatedAt' | 'publishedAt' | 'closedAt'>>({
+    createProject: builder.mutation<
+      Project,
+      Omit<
+        Project,
+        "projectId" | "createdAt" | "updatedAt" | "publishedAt" | "closedAt"
+      >
+    >({
       queryFn: async (projectData) => {
         try {
-          const docRef = doc(collection(db, 'projects'))
-          const now = Timestamp.now()
-          
+          const docRef = doc(collection(db, "projects"));
+          const now = Timestamp.now();
+
           // Deserialize string dates to Timestamps for Firestore storage
-          const deserializedProjectData = deserializeProjectForStorage(projectData)
-          
+          const deserializedProjectData =
+            deserializeProjectForStorage(projectData);
+
           const newProject = {
             ...deserializedProjectData,
             projectId: docRef.id,
             createdAt: now,
             updatedAt: now,
-            publishedAt: projectData.status === 'active' ? now : null,
+            publishedAt: projectData.status === "active" ? now : null,
             closedAt: null,
-          }
-          
-          await setDoc(docRef, newProject)
-          
+          };
+
+          await setDoc(docRef, newProject);
+
           // Serialize the project before returning it to Redux
-          const serializedProject = serializeProject(newProject)
-          
-          return { data: serializedProject }
+          const serializedProject = serializeProject(newProject);
+
+          return { data: serializedProject };
         } catch (error: any) {
-          console.error('🚀 CreateProject error:', error)
-          return { error: { status: 'CUSTOM_ERROR', error: error.message } }
+          console.error("🚀 CreateProject error:", error);
+          return { error: { status: "CUSTOM_ERROR", error: error.message } };
         }
       },
-      invalidatesTags: ['Project'],
+      invalidatesTags: ["Project"],
     }),
 
-    updateProject: builder.mutation<Project, { projectId: string; updateData: Partial<Project> }>({
+    updateProject: builder.mutation<
+      Project,
+      { projectId: string; updateData: Partial<Project> }
+    >({
       queryFn: async ({ projectId, updateData }) => {
         try {
-          const projectRef = doc(db, 'projects', projectId)
-          
+          const projectRef = doc(db, "projects", projectId);
+
           // First get the current document to preserve important fields
-          const currentDoc = await getDoc(projectRef)
-          const currentData = currentDoc.data() || {}
-          
+          const currentDoc = await getDoc(projectRef);
+          const currentData = currentDoc.data() || {};
+
           // Filter out null values and undefined values from updateData
           // These indicate fields that should be preserved, not overwritten
-          const filteredUpdateData = { ...updateData }
-          Object.keys(filteredUpdateData).forEach(key => {
-            if (filteredUpdateData[key as keyof typeof filteredUpdateData] === null || 
-                filteredUpdateData[key as keyof typeof filteredUpdateData] === undefined) {
-              delete filteredUpdateData[key as keyof typeof filteredUpdateData]
+          const filteredUpdateData = { ...updateData };
+          Object.keys(filteredUpdateData).forEach((key) => {
+            if (
+              filteredUpdateData[key as keyof typeof filteredUpdateData] ===
+                null ||
+              filteredUpdateData[key as keyof typeof filteredUpdateData] ===
+                undefined
+            ) {
+              delete filteredUpdateData[key as keyof typeof filteredUpdateData];
             }
-          })
-          
+          });
+
           // Deserialize string dates to Timestamps for Firestore storage
-          const deserializedUpdateData = deserializeProjectForStorage(filteredUpdateData)
-          
+          const deserializedUpdateData =
+            deserializeProjectForStorage(filteredUpdateData);
+
           // Carefully merge the update data
           const updateDataWithTimestamp = {
             ...deserializedUpdateData,
             updatedAt: Timestamp.now(),
             // Set publishedAt if status is being changed to active
-            ...(filteredUpdateData.status === 'active' && !currentData.publishedAt && { publishedAt: Timestamp.now() }),
+            ...(filteredUpdateData.status === "active" &&
+              !currentData.publishedAt && { publishedAt: Timestamp.now() }),
             // Set closedAt if status is being changed to completed or cancelled
-            ...((['completed', 'cancelled'].includes(filteredUpdateData.status as string)) && { closedAt: Timestamp.now() }),
+            ...(["completed", "cancelled"].includes(
+              filteredUpdateData.status as string
+            ) && { closedAt: Timestamp.now() }),
             // Only update proposalCount if it's explicitly provided and valid
-            ...(filteredUpdateData.proposalCount !== undefined ? 
-              { proposalCount: filteredUpdateData.proposalCount } : 
-              { proposalCount: currentData.proposalCount || 0 }),
+            ...(filteredUpdateData.proposalCount !== undefined
+              ? { proposalCount: filteredUpdateData.proposalCount }
+              : { proposalCount: currentData.proposalCount || 0 }),
             // Only update hiredFreelancerId if it's explicitly provided and valid
-            ...(filteredUpdateData.hiredFreelancerId ? 
-              { hiredFreelancerId: filteredUpdateData.hiredFreelancerId } : 
-              { hiredFreelancerId: currentData.hiredFreelancerId || '' })
-          }
-          
-          await updateDoc(projectRef, updateDataWithTimestamp)
-          
-          const updatedDoc = await getDoc(projectRef)
-          const docData = updatedDoc.data()
+            ...(filteredUpdateData.hiredFreelancerId
+              ? { hiredFreelancerId: filteredUpdateData.hiredFreelancerId }
+              : { hiredFreelancerId: currentData.hiredFreelancerId || "" }),
+          };
+
+          await updateDoc(projectRef, updateDataWithTimestamp);
+
+          const updatedDoc = await getDoc(projectRef);
+          const docData = updatedDoc.data();
           const project = {
             projectId: updatedDoc.id,
-            ...docData
-          } as Project
-          
+            ...docData,
+          } as Project;
+
           // Serialize the project before returning it to Redux
-          return { data: serializeProject(project) }
+          return { data: serializeProject(project) };
         } catch (error: any) {
-          return { error: { status: 'CUSTOM_ERROR', error: error.message } }
+          return { error: { status: "CUSTOM_ERROR", error: error.message } };
         }
       },
-      invalidatesTags: ['Project'],
+      invalidatesTags: ["Project"],
     }),
 
-    saveProjectDraft: builder.mutation<{ success: boolean; projectId?: string }, {
-      projectData: Partial<Project>;
-      isDraft: boolean;
-    }>({
+    saveProjectDraft: builder.mutation<
+      { success: boolean; projectId?: string },
+      {
+        projectData: Partial<Project>;
+        isDraft: boolean;
+      }
+    >({
       queryFn: async ({ projectData, isDraft }) => {
         try {
-          let docRef: any
-          
+          let docRef: any;
+
           if (projectData.projectId) {
             // Update existing draft
-            docRef = doc(db, 'projects', projectData.projectId)
+            docRef = doc(db, "projects", projectData.projectId);
             await updateDoc(docRef, {
               ...projectData,
-              status: isDraft ? 'draft' : 'active',
+              status: isDraft ? "draft" : "active",
               updatedAt: Timestamp.now(),
-              ...((!isDraft && !projectData.publishedAt) && { publishedAt: Timestamp.now() })
-            })
+              ...(!isDraft &&
+                !projectData.publishedAt && { publishedAt: Timestamp.now() }),
+            });
           } else {
             // Create new draft
-            docRef = doc(collection(db, 'projects'))
-            const now = Timestamp.now()
+            docRef = doc(collection(db, "projects"));
+            const now = Timestamp.now();
             await setDoc(docRef, {
               ...projectData,
               projectId: docRef.id,
-              status: isDraft ? 'draft' : 'active',
+              status: isDraft ? "draft" : "active",
               createdAt: now,
               updatedAt: now,
               publishedAt: isDraft ? null : now,
               closedAt: null,
-            })
+            });
           }
-          
-          return { 
-            data: { 
-              success: true, 
-              projectId: docRef.id 
-            } 
-          }
+
+          return {
+            data: {
+              success: true,
+              projectId: docRef.id,
+            },
+          };
         } catch (error: any) {
-          return { error: { status: 'CUSTOM_ERROR', error: error.message } }
+          return { error: { status: "CUSTOM_ERROR", error: error.message } };
         }
       },
-      invalidatesTags: ['Project'],
+      invalidatesTags: ["Project"],
     }),
 
     // Proposal endpoints
     getProposal: builder.query<Proposal, string>({
       queryFn: async (proposalId) => {
         try {
-          const docRef = doc(db, 'proposals', proposalId);
+          const docRef = doc(db, "proposals", proposalId);
           const docSnap = await getDoc(docRef);
-          
+
           if (!docSnap.exists()) {
-            throw new Error('Proposal not found');
+            throw new Error("Proposal not found");
           }
-          
+
           const data = docSnap.data();
-          
+
           // Serialize timestamps for Redux
           const serializedData = {
             ...data,
-            submittedAt: data.submittedAt ? data.submittedAt.toDate().toISOString() : null,
-            updatedAt: data.updatedAt ? data.updatedAt.toDate().toISOString() : null,
-            respondedAt: data.respondedAt ? data.respondedAt.toDate().toISOString() : null,
-            bid: data.bid ? {
-              ...data.bid,
-              deliveryDate: data.bid.deliveryDate ? data.bid.deliveryDate.toDate().toISOString() : null
-            } : null
+            submittedAt: data.submittedAt
+              ? data.submittedAt.toDate().toISOString()
+              : null,
+            updatedAt: data.updatedAt
+              ? data.updatedAt.toDate().toISOString()
+              : null,
+            respondedAt: data.respondedAt
+              ? data.respondedAt.toDate().toISOString()
+              : null,
+            bid: data.bid
+              ? {
+                  ...data.bid,
+                  deliveryDate: data.bid.deliveryDate
+                    ? data.bid.deliveryDate.toDate().toISOString()
+                    : null,
+                }
+              : null,
           };
-          
+
           const proposal = {
             proposalId: docSnap.id,
-            ...serializedData
+            ...serializedData,
           } as Proposal;
-          
+
           return { data: proposal };
         } catch (error: any) {
-          return { error: { status: 'CUSTOM_ERROR', error: error.message } };
+          return { error: { status: "CUSTOM_ERROR", error: error.message } };
         }
       },
-      providesTags: (result, error, id) => [{ type: 'Proposal', id }],
+      providesTags: (result, error, id) => [{ type: "Proposal", id }],
     }),
 
-    getProposals: builder.query<Proposal[], { projectId?: string; freelancerId?: string }>({
+    getProposals: builder.query<
+      Proposal[],
+      { projectId?: string; freelancerId?: string }
+    >({
       queryFn: async ({ projectId, freelancerId }) => {
-        console.log('API - getProposals called with:', { projectId, freelancerId });
-        
+        console.log("API - getProposals called with:", {
+          projectId,
+          freelancerId,
+        });
+
         try {
           // Start with a basic query
-          let q = query(collection(db, 'proposals'))
-          
+          let q = query(collection(db, "proposals"));
+
           if (projectId) {
-            console.log('API - Filtering proposals by projectId:', projectId);
+            console.log("API - Filtering proposals by projectId:", projectId);
             // Use the index that includes projectId and submittedAt
-            q = query(q, 
-              where('projectId', '==', projectId),
-              orderBy('submittedAt', 'desc')
-            )
+            q = query(
+              q,
+              where("projectId", "==", projectId),
+              orderBy("submittedAt", "desc")
+            );
           } else {
             // If no projectId, just order by submittedAt
-            q = query(q, orderBy('submittedAt', 'desc'))
+            q = query(q, orderBy("submittedAt", "desc"));
           }
-          
+
           if (freelancerId) {
-            console.log('API - Filtering proposals by freelancerId:', freelancerId);
-            q = query(q, where('freelancerId', '==', freelancerId))
+            console.log(
+              "API - Filtering proposals by freelancerId:",
+              freelancerId
+            );
+            q = query(q, where("freelancerId", "==", freelancerId));
           }
-          
-          console.log('API - Executing Firestore query for proposals');
-          const querySnapshot = await getDocs(q)
-          console.log('API - Found proposal documents:', querySnapshot.size);
-          
-          const proposals = querySnapshot.docs.map(doc => {
-            console.log('API - Processing proposal document:', doc.id);
-            const data = doc.data()
-            
+
+          console.log("API - Executing Firestore query for proposals");
+          const querySnapshot = await getDocs(q);
+          console.log("API - Found proposal documents:", querySnapshot.size);
+
+          const proposals = querySnapshot.docs.map((doc) => {
+            console.log("API - Processing proposal document:", doc.id);
+            const data = doc.data();
+
             // Serialize Firestore timestamps to ISO strings for Redux
             const serializedData = {
               ...data,
-              submittedAt: data.submittedAt ? data.submittedAt.toDate().toISOString() : null,
-              updatedAt: data.updatedAt ? data.updatedAt.toDate().toISOString() : null,
-              respondedAt: data.respondedAt ? data.respondedAt.toDate().toISOString() : null,
-              bid: data.bid ? {
-                ...data.bid,
-                deliveryDate: data.bid.deliveryDate ? data.bid.deliveryDate.toDate().toISOString() : null
-              } : null
+              submittedAt: data.submittedAt
+                ? data.submittedAt.toDate().toISOString()
+                : null,
+              updatedAt: data.updatedAt
+                ? data.updatedAt.toDate().toISOString()
+                : null,
+              respondedAt: data.respondedAt
+                ? data.respondedAt.toDate().toISOString()
+                : null,
+              bid: data.bid
+                ? {
+                    ...data.bid,
+                    deliveryDate: data.bid.deliveryDate
+                      ? data.bid.deliveryDate.toDate().toISOString()
+                      : null,
+                  }
+                : null,
             };
-            
+
             const processedProposal = {
               proposalId: doc.id,
-              ...serializedData
+              ...serializedData,
             } as Proposal;
-            
-            console.log('API - Processed proposal:', {
+
+            console.log("API - Processed proposal:", {
               id: processedProposal.proposalId,
               projectId: processedProposal.projectId,
               freelancerId: processedProposal.freelancerId,
-              status: processedProposal.status
+              status: processedProposal.status,
             });
-            
+
             return processedProposal;
-          })
-          
-          console.log('API - Returning proposals data, count:', proposals.length);
-          return { data: proposals }
+          });
+
+          console.log(
+            "API - Returning proposals data, count:",
+            proposals.length
+          );
+          return { data: proposals };
         } catch (error: any) {
           console.error("Error fetching proposals:", error);
-          return { error: { status: 'CUSTOM_ERROR', error: error.message } }
+          return { error: { status: "CUSTOM_ERROR", error: error.message } };
         }
       },
-      providesTags: ['Proposal'],
+      providesTags: ["Proposal"],
     }),
 
     createProposal: builder.mutation<Proposal, any>({
@@ -1119,32 +1307,34 @@ export const firebaseApi = createApi({
         try {
           // Ensure required fields
           if (!proposalData.projectId) {
-            throw new Error("Project ID is required")
+            throw new Error("Project ID is required");
           }
           if (!proposalData.freelancerId) {
-            throw new Error("Freelancer ID is required")
+            throw new Error("Freelancer ID is required");
           }
-          
+
           // Check if the freelancer has already submitted a proposal for this project
           const existingProposalQuery = query(
-            collection(db, 'proposals'),
-            where('projectId', '==', proposalData.projectId),
-            where('freelancerId', '==', proposalData.freelancerId)
-          )
-          
-          const existingProposalSnapshot = await getDocs(existingProposalQuery)
-          
+            collection(db, "proposals"),
+            where("projectId", "==", proposalData.projectId),
+            where("freelancerId", "==", proposalData.freelancerId)
+          );
+
+          const existingProposalSnapshot = await getDocs(existingProposalQuery);
+
           if (!existingProposalSnapshot.empty) {
-            throw new Error("You have already submitted a proposal for this project")
+            throw new Error(
+              "You have already submitted a proposal for this project"
+            );
           }
-          
+
           // Convert JS Date objects to Firestore Timestamps with safer handling
           let formattedProposalData = {
             ...proposalData,
             submittedAt: (() => {
               if (proposalData.submittedAt instanceof Date) {
                 return Timestamp.fromDate(proposalData.submittedAt);
-              } else if (typeof proposalData.submittedAt === 'string') {
+              } else if (typeof proposalData.submittedAt === "string") {
                 return Timestamp.fromDate(new Date(proposalData.submittedAt));
               } else if (proposalData.submittedAt instanceof Timestamp) {
                 return proposalData.submittedAt;
@@ -1155,7 +1345,7 @@ export const firebaseApi = createApi({
             updatedAt: (() => {
               if (proposalData.updatedAt instanceof Date) {
                 return Timestamp.fromDate(proposalData.updatedAt);
-              } else if (typeof proposalData.updatedAt === 'string') {
+              } else if (typeof proposalData.updatedAt === "string") {
                 return Timestamp.fromDate(new Date(proposalData.updatedAt));
               } else if (proposalData.updatedAt instanceof Timestamp) {
                 return proposalData.updatedAt;
@@ -1169,93 +1359,106 @@ export const firebaseApi = createApi({
               deliveryDate: (() => {
                 if (proposalData.bid?.deliveryDate instanceof Date) {
                   return Timestamp.fromDate(proposalData.bid.deliveryDate);
-                } else if (typeof proposalData.bid?.deliveryDate === 'string') {
-                  return Timestamp.fromDate(new Date(proposalData.bid.deliveryDate));
-                } else if (proposalData.bid?.deliveryDate instanceof Timestamp) {
+                } else if (typeof proposalData.bid?.deliveryDate === "string") {
+                  return Timestamp.fromDate(
+                    new Date(proposalData.bid.deliveryDate)
+                  );
+                } else if (
+                  proposalData.bid?.deliveryDate instanceof Timestamp
+                ) {
                   return proposalData.bid.deliveryDate;
                 } else {
-                  return Timestamp.fromDate(new Date(Date.now() + (30 * 24 * 60 * 60 * 1000))); // Default to 30 days from now
+                  return Timestamp.fromDate(
+                    new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+                  ); // Default to 30 days from now
                 }
-              })()
-            }
-          }
-          
+              })(),
+            },
+          };
+
           // Create a new proposal document
-          const proposalRef = doc(collection(db, 'proposals'))
-          const proposalId = proposalRef.id
-          
+          const proposalRef = doc(collection(db, "proposals"));
+          const proposalId = proposalRef.id;
+
           // Add the proposalId to the data
-          formattedProposalData.proposalId = proposalId
-          
+          formattedProposalData.proposalId = proposalId;
+
           // Save the proposal
-          await setDoc(proposalRef, formattedProposalData)
-          
+          await setDoc(proposalRef, formattedProposalData);
+
           // Update the project's proposal count
-          const projectRef = doc(db, 'projects', proposalData.projectId)
+          const projectRef = doc(db, "projects", proposalData.projectId);
           await updateDoc(projectRef, {
-            proposalCount: (await getDoc(projectRef)).data()?.proposalCount + 1 || 1
-          })
-          
+            proposalCount:
+              (await getDoc(projectRef)).data()?.proposalCount + 1 || 1,
+          });
+
           // Create a notification for the project owner
           try {
-            const projectSnapshot = await getDoc(projectRef)
-            const projectData = projectSnapshot.data()
-            
+            const projectSnapshot = await getDoc(projectRef);
+            const projectData = projectSnapshot.data();
+
             if (projectData && projectData.clientId) {
-              const notificationRef = doc(collection(db, 'notifications'))
+              const notificationRef = doc(collection(db, "notifications"));
               await setDoc(notificationRef, {
                 notificationId: notificationRef.id,
                 userId: projectData.clientId,
-                type: 'proposal_received',
-                title: 'New Proposal Received',
+                type: "proposal_received",
+                title: "New Proposal Received",
                 message: `${proposalData.freelancerInfo.name} submitted a proposal for your project "${projectData.title}"`,
                 data: {
                   projectId: proposalData.projectId,
-                  proposalId: proposalId
+                  proposalId: proposalId,
                 },
                 isRead: false,
                 isPush: true,
                 isEmail: true,
                 createdAt: Timestamp.now(),
-                readAt: null
-              })
+                readAt: null,
+              });
             }
           } catch (notificationError) {
             // Don't fail the proposal submission if notification creation fails
-            console.error('Failed to create notification:', notificationError)
+            console.error("Failed to create notification:", notificationError);
           }
-          
+
           // Return serialized proposal data for Redux with safer handling
           const serializedProposal = {
             ...formattedProposalData,
-            submittedAt: formattedProposalData.submittedAt?.toDate ? 
-              formattedProposalData.submittedAt.toDate().toISOString() : 
-              formattedProposalData.submittedAt ? new Date(formattedProposalData.submittedAt).toISOString() : null,
-            updatedAt: formattedProposalData.updatedAt?.toDate ? 
-              formattedProposalData.updatedAt.toDate().toISOString() : 
-              formattedProposalData.updatedAt ? new Date(formattedProposalData.updatedAt).toISOString() : null,
+            submittedAt: formattedProposalData.submittedAt?.toDate
+              ? formattedProposalData.submittedAt.toDate().toISOString()
+              : formattedProposalData.submittedAt
+              ? new Date(formattedProposalData.submittedAt).toISOString()
+              : null,
+            updatedAt: formattedProposalData.updatedAt?.toDate
+              ? formattedProposalData.updatedAt.toDate().toISOString()
+              : formattedProposalData.updatedAt
+              ? new Date(formattedProposalData.updatedAt).toISOString()
+              : null,
             respondedAt: null,
             bid: {
               ...formattedProposalData.bid,
-              deliveryDate: formattedProposalData.bid?.deliveryDate?.toDate ? 
-                formattedProposalData.bid.deliveryDate.toDate().toISOString() : 
-                formattedProposalData.bid?.deliveryDate ? new Date(formattedProposalData.bid.deliveryDate).toISOString() : null
-            }
-          }
-          
-          return { data: serializedProposal as Proposal }
+              deliveryDate: formattedProposalData.bid?.deliveryDate?.toDate
+                ? formattedProposalData.bid.deliveryDate.toDate().toISOString()
+                : formattedProposalData.bid?.deliveryDate
+                ? new Date(formattedProposalData.bid.deliveryDate).toISOString()
+                : null,
+            },
+          };
+
+          return { data: serializedProposal as Proposal };
         } catch (error: any) {
-          return { error: { status: 'CUSTOM_ERROR', error: error.message } }
+          return { error: { status: "CUSTOM_ERROR", error: error.message } };
         }
       },
-      invalidatesTags: ['Proposal', 'Project'],
+      invalidatesTags: ["Proposal", "Project"],
     }),
 
     updateProposal: builder.mutation<Proposal, { id: string; proposal: any }>({
       queryFn: async ({ id, proposal }) => {
         try {
-          const proposalRef = doc(db, 'proposals', id);
-          
+          const proposalRef = doc(db, "proposals", id);
+
           // Convert dates back to Firestore Timestamps
           const formattedProposalData = {
             ...proposal,
@@ -1263,7 +1466,7 @@ export const firebaseApi = createApi({
             submittedAt: (() => {
               if (proposal.submittedAt instanceof Date) {
                 return Timestamp.fromDate(proposal.submittedAt);
-              } else if (typeof proposal.submittedAt === 'string') {
+              } else if (typeof proposal.submittedAt === "string") {
                 return Timestamp.fromDate(new Date(proposal.submittedAt));
               } else if (proposal.submittedAt instanceof Timestamp) {
                 return proposal.submittedAt;
@@ -1278,108 +1481,138 @@ export const firebaseApi = createApi({
               deliveryDate: (() => {
                 if (proposal.bid?.deliveryDate instanceof Date) {
                   return Timestamp.fromDate(proposal.bid.deliveryDate);
-                } else if (typeof proposal.bid?.deliveryDate === 'string') {
-                  return Timestamp.fromDate(new Date(proposal.bid.deliveryDate));
+                } else if (typeof proposal.bid?.deliveryDate === "string") {
+                  return Timestamp.fromDate(
+                    new Date(proposal.bid.deliveryDate)
+                  );
                 } else if (proposal.bid?.deliveryDate instanceof Timestamp) {
                   return proposal.bid.deliveryDate;
                 } else {
-                  return Timestamp.fromDate(new Date(Date.now() + (30 * 24 * 60 * 60 * 1000))); // Default to 30 days from now
+                  return Timestamp.fromDate(
+                    new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+                  ); // Default to 30 days from now
                 }
-              })()
-            }
+              })(),
+            },
           };
-          
+
           // Update the document
           await setDoc(proposalRef, formattedProposalData);
-          
+
           // Fetch the updated document
           const updatedDoc = await getDoc(proposalRef);
           if (!updatedDoc.exists()) {
-            throw new Error('Proposal not found after update');
+            throw new Error("Proposal not found after update");
           }
-          
+
           const docData = updatedDoc.data();
-          
+
           // Serialize the data for Redux
           const serializedProposal = {
             proposalId: updatedDoc.id,
             ...docData,
             submittedAt: docData.submittedAt.toDate().toISOString(),
             updatedAt: docData.updatedAt.toDate().toISOString(),
-            respondedAt: docData.respondedAt ? docData.respondedAt.toDate().toISOString() : null,
+            respondedAt: docData.respondedAt
+              ? docData.respondedAt.toDate().toISOString()
+              : null,
             bid: {
               ...docData.bid,
-              deliveryDate: docData.bid.deliveryDate.toDate().toISOString()
-            }
+              deliveryDate: docData.bid.deliveryDate.toDate().toISOString(),
+            },
           };
-          
+
           return { data: serializedProposal as Proposal };
         } catch (error: any) {
-          console.error('Error updating proposal:', error);
-          return { error: { status: 'CUSTOM_ERROR', error: error.message } };
+          console.error("Error updating proposal:", error);
+          return { error: { status: "CUSTOM_ERROR", error: error.message } };
         }
       },
-      invalidatesTags: ['Proposal', 'Project'],
+      invalidatesTags: ["Proposal", "Project"],
     }),
 
     // Progressive Signup endpoints
-    saveSignupStep: builder.mutation<{ success: boolean }, { step: number; data: Partial<SignupFormData> }>({
+    saveSignupStep: builder.mutation<
+      { success: boolean },
+      { step: number; data: Partial<SignupFormData> }
+    >({
       queryFn: async ({ step, data }) => {
         try {
           // Create the data object with timestamp
-          const stepData = { 
-            ...data, 
+          const stepData = {
+            ...data,
             currentStep: step,
             lastSavedAt: new Date().toISOString(),
-            stepCompletedAt: new Date().toISOString()
-          }
+            stepCompletedAt: new Date().toISOString(),
+          };
 
           // Always save to localStorage first (immediate persistence)
-          const existingLocalData = localStorage.getItem('bizzlink_signup_progress')
-          const currentLocalData = existingLocalData ? JSON.parse(existingLocalData) : {}
-          const updatedLocalData = { 
-            ...currentLocalData, 
-            ...stepData
-          }
-          localStorage.setItem('bizzlink_signup_progress', JSON.stringify(updatedLocalData))
-          console.log(`📱 Step ${step} saved to localStorage`)
+          const existingLocalData = localStorage.getItem(
+            "bizzlink_signup_progress"
+          );
+          const currentLocalData = existingLocalData
+            ? JSON.parse(existingLocalData)
+            : {};
+          const updatedLocalData = {
+            ...currentLocalData,
+            ...stepData,
+          };
+          localStorage.setItem(
+            "bizzlink_signup_progress",
+            JSON.stringify(updatedLocalData)
+          );
+          console.log(`📱 Step ${step} saved to localStorage`);
 
           // If we have a tempUserId, try to save to Firebase as well
           if (data.tempUserId) {
             try {
-              await setDoc(doc(db, 'signup_progress', data.tempUserId), stepData)
-              console.log(`🔥 Step ${step} saved to Firebase for user ${data.tempUserId}`)
+              await setDoc(
+                doc(db, "signup_progress", data.tempUserId),
+                stepData
+              );
+              console.log(
+                `🔥 Step ${step} saved to Firebase for user ${data.tempUserId}`
+              );
             } catch (firebaseError: any) {
-              console.warn(`⚠️ Firebase save failed for step ${step}: ${firebaseError.message}`)
+              console.warn(
+                `⚠️ Firebase save failed for step ${step}: ${firebaseError.message}`
+              );
               // Continue anyway since localStorage save was successful
             }
           } else {
-            console.log(`⚠️ Step ${step} saved to localStorage only (no tempUserId)`)
+            console.log(
+              `⚠️ Step ${step} saved to localStorage only (no tempUserId)`
+            );
           }
 
-          return { data: { success: true } }
+          return { data: { success: true } };
         } catch (error: any) {
-          console.error(`❌ Failed to save step ${step}:`, error)
-          return { error: { status: 'CUSTOM_ERROR', error: error.message } }
+          console.error(`❌ Failed to save step ${step}:`, error);
+          return { error: { status: "CUSTOM_ERROR", error: error.message } };
         }
       },
     }),
 
-    createTempUser: builder.mutation<{ tempUserId: string }, { userType: 'freelancer' | 'client' }>({
+    createTempUser: builder.mutation<
+      { tempUserId: string },
+      { userType: "freelancer" | "client" }
+    >({
       queryFn: async ({ userType }) => {
         try {
-          let tempUserId: string
-          
+          let tempUserId: string;
+
           try {
             // Try to create anonymous user first
-            const userCredential = await signInAnonymously(auth)
-            tempUserId = userCredential.user.uid
-            console.log(`🔥 Created anonymous user: ${tempUserId}`)
+            const userCredential = await signInAnonymously(auth);
+            tempUserId = userCredential.user.uid;
+            console.log(`🔥 Created anonymous user: ${tempUserId}`);
           } catch (authError: any) {
             // If anonymous auth fails, generate a temporary ID
-            console.warn(`⚠️ Anonymous auth failed: ${authError.message}`)
-            tempUserId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-            console.log(`🔧 Using temporary ID: ${tempUserId}`)
+            console.warn(`⚠️ Anonymous auth failed: ${authError.message}`);
+            tempUserId = `temp_${Date.now()}_${Math.random()
+              .toString(36)
+              .substr(2, 9)}`;
+            console.log(`🔧 Using temporary ID: ${tempUserId}`);
           }
 
           // Save initial progress data to both localStorage and Firebase
@@ -1389,25 +1622,30 @@ export const firebaseApi = createApi({
             tempUserId,
             createdAt: new Date().toISOString(),
             lastSavedAt: new Date().toISOString(),
-            isComplete: false
-          }
+            isComplete: false,
+          };
 
           // Try to save to Firebase first (if available)
           try {
-            await setDoc(doc(db, 'signup_progress', tempUserId), initialData)
-            console.log(`🔥 Created temp user ${tempUserId} in Firebase signup_progress collection`)
+            await setDoc(doc(db, "signup_progress", tempUserId), initialData);
+            console.log(
+              `🔥 Created temp user ${tempUserId} in Firebase signup_progress collection`
+            );
           } catch (firebaseError: any) {
-            console.warn(`⚠️ Firebase save failed: ${firebaseError.message}`)
+            console.warn(`⚠️ Firebase save failed: ${firebaseError.message}`);
           }
-          
-          // Always save to localStorage as backup
-          localStorage.setItem('bizzlink_signup_progress', JSON.stringify(initialData))
-          console.log(`📱 Saved temp user data to localStorage`)
 
-          return { data: { tempUserId } }
+          // Always save to localStorage as backup
+          localStorage.setItem(
+            "bizzlink_signup_progress",
+            JSON.stringify(initialData)
+          );
+          console.log(`📱 Saved temp user data to localStorage`);
+
+          return { data: { tempUserId } };
         } catch (error: any) {
-          console.error('❌ Failed to create temp user:', error)
-          return { error: { status: 'CUSTOM_ERROR', error: error.message } }
+          console.error("❌ Failed to create temp user:", error);
+          return { error: { status: "CUSTOM_ERROR", error: error.message } };
         }
       },
     }),
@@ -1417,28 +1655,32 @@ export const firebaseApi = createApi({
         try {
           // Try to load from Firebase first
           try {
-            const progressDoc = await getDoc(doc(db, 'signup_progress', tempUserId))
-            
+            const progressDoc = await getDoc(
+              doc(db, "signup_progress", tempUserId)
+            );
+
             if (progressDoc.exists()) {
-              console.log(`🔥 Loaded signup progress from Firebase for user ${tempUserId}`)
-              return { data: progressDoc.data() as SignupFormData }
+              console.log(
+                `🔥 Loaded signup progress from Firebase for user ${tempUserId}`
+              );
+              return { data: progressDoc.data() as SignupFormData };
             }
           } catch (firebaseError: any) {
-            console.warn(`⚠️ Firebase load failed: ${firebaseError.message}`)
+            console.warn(`⚠️ Firebase load failed: ${firebaseError.message}`);
           }
 
           // Fallback to localStorage
-          const localData = localStorage.getItem('bizzlink_signup_progress')
+          const localData = localStorage.getItem("bizzlink_signup_progress");
           if (localData) {
-            console.log(`📱 Loaded signup progress from localStorage`)
-            return { data: JSON.parse(localData) as SignupFormData }
+            console.log(`📱 Loaded signup progress from localStorage`);
+            return { data: JSON.parse(localData) as SignupFormData };
           }
 
-          console.log(`ℹ️ No signup progress found for user ${tempUserId}`)
-          return { data: null }
+          console.log(`ℹ️ No signup progress found for user ${tempUserId}`);
+          return { data: null };
         } catch (error: any) {
-          console.error(`❌ Failed to load signup progress:`, error)
-          return { error: { status: 'CUSTOM_ERROR', error: error.message } }
+          console.error(`❌ Failed to load signup progress:`, error);
+          return { error: { status: "CUSTOM_ERROR", error: error.message } };
         }
       },
     }),
@@ -1448,20 +1690,20 @@ export const firebaseApi = createApi({
         try {
           // Create the actual user account with email/password
           const userCredential = await createUserWithEmailAndPassword(
-            auth, 
-            signupData.email, 
+            auth,
+            signupData.email,
             signupData.password
-          )
-          const firebaseUser = userCredential.user
-          
+          );
+          const firebaseUser = userCredential.user;
+
           // Update Firebase profile
           await updateProfile(firebaseUser, {
-            displayName: `${signupData.firstname} ${signupData.lastname}`
-          })
-          
+            displayName: `${signupData.firstname} ${signupData.lastname}`,
+          });
+
           // Send email verification
-          await sendEmailVerification(firebaseUser)
-          
+          await sendEmailVerification(firebaseUser);
+
           // Create full user document with string timestamps for Redux
           const userData: User = {
             userId: firebaseUser.uid,
@@ -1470,27 +1712,30 @@ export const firebaseApi = createApi({
             firstname: signupData.firstname,
             lastname: signupData.lastname,
             displayName: `${signupData.firstname} ${signupData.lastname}`,
-            role: (signupData.userType as string) === 'freelancer' ? 'freelancer' : 'client',
-            title: signupData.title || '',
-            overview: signupData.overview || '',
-            hourRate: '$ 0',
-            photoURL: firebaseUser.photoURL || '',
+            role:
+              (signupData.userType as string) === "freelancer"
+                ? "freelancer"
+                : "client",
+            title: signupData.title || "",
+            overview: signupData.overview || "",
+            hourRate: "$ 0",
+            photoURL: firebaseUser.photoURL || "",
             isActive: true,
             isVerified: firebaseUser.emailVerified,
-            accountStatus: 'pending',
+            accountStatus: "pending",
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             lastLoginAt: new Date().toISOString(),
             about: {
-              streetAddress: '',
-              city: '',
-              state: '',
-              country: '',
-              zipCode: '',
-              tel: '',
-              dob: '',
-              profileUrl: '',
-              downloadLink: ''
+              streetAddress: "",
+              city: "",
+              state: "",
+              country: "",
+              zipCode: "",
+              tel: "",
+              dob: "",
+              profileUrl: "",
+              downloadLink: "",
             },
             skills: [],
             specialties: [],
@@ -1507,100 +1752,111 @@ export const firebaseApi = createApi({
               totalReviews: 0,
               responseRate: 0,
               onTimeDelivery: 0,
-              repeatClients: 0
+              repeatClients: 0,
             },
             preferences: {
-              timezone: 'UTC',
-              language: 'en',
-              currency: 'USD',
+              timezone: "UTC",
+              language: "en",
+              currency: "USD",
               emailNotifications: true,
               pushNotifications: true,
-              availability: 'available'
-            }
-          }
-          
+              availability: "available",
+            },
+          };
+
           // Create Firestore version with Firestore Timestamps
           const firestoreUserData = {
             ...userData,
             createdAt: Timestamp.now(),
             updatedAt: Timestamp.now(),
             lastLoginAt: Timestamp.now(),
-          }
-          
-          await setDoc(doc(db, 'users', firebaseUser.uid), firestoreUserData)
-          
+          };
+
+          await setDoc(doc(db, "users", firebaseUser.uid), firestoreUserData);
+
           // Clean up temporary data
           if (signupData.tempUserId) {
-            await deleteDoc(doc(db, 'signup_progress', signupData.tempUserId))
+            await deleteDoc(doc(db, "signup_progress", signupData.tempUserId));
           }
           // Don't clear localStorage here - let useProgressiveSignup handle it
           // localStorage.removeItem('bizzlink_signup_progress')
-          
-          return { data: userData }
+
+          return { data: userData };
         } catch (error: any) {
-          return { error: { status: 'CUSTOM_ERROR', error: error.message } }
+          return { error: { status: "CUSTOM_ERROR", error: error.message } };
         }
       },
-      invalidatesTags: ['User'],
+      invalidatesTags: ["User"],
     }),
 
-    googleSignupStep: builder.mutation<{ user: User; isNewUser: boolean }, { userType?: 'freelancer' | 'client' }>({
+    googleSignupStep: builder.mutation<
+      { user: User; isNewUser: boolean },
+      { userType?: "freelancer" | "client" }
+    >({
       queryFn: async ({ userType }) => {
         try {
-          const provider = new GoogleAuthProvider()
-          
+          const provider = new GoogleAuthProvider();
+
           // Add popup configuration to handle CORP policy issues
           provider.setCustomParameters({
-            prompt: 'select_account'
-          })
-          
-          const userCredential = await signInWithPopup(auth, provider)
-          const firebaseUser = userCredential.user
-          
+            prompt: "select_account",
+          });
+
+          const userCredential = await signInWithPopup(auth, provider);
+          const firebaseUser = userCredential.user;
+
           // Check if user exists in Firestore
-          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid))
-          
+          const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
+
           if (userDoc.exists()) {
             // Existing user - login
-            const userData = userDoc.data()
-            
+            const userData = userDoc.data();
+
             // Clean up any progress data only for existing users
             // For existing users returning, we can clear signup progress
-            localStorage.removeItem('bizzlink_signup_progress')
-            localStorage.removeItem('bizzlink_user_onboarding')
-            
-            return { data: { user: serializeUser(userData), isNewUser: false } }
+            localStorage.removeItem("bizzlink_signup_progress");
+            localStorage.removeItem("bizzlink_user_onboarding");
+
+            return {
+              data: { user: serializeUser(userData), isNewUser: false },
+            };
           } else {
             // New user - create profile with provided userType or default
-            const now = new Date().toISOString()
+            const now = new Date().toISOString();
             const userData: User = {
               userId: firebaseUser.uid,
               email: firebaseUser.email!,
               emailVerified: firebaseUser.emailVerified,
-              firstname: firebaseUser.displayName?.split(' ')[0] || '',
-              lastname: firebaseUser.displayName?.split(' ').slice(1).join(' ') || '',
-              displayName: firebaseUser.displayName || '',
-              role: userType === 'freelancer' ? 'freelancer' : userType === 'client' ? 'client' : 'client',
-              title: '',
-              overview: '',
-              hourRate: '$ 0',
-              photoURL: firebaseUser.photoURL || '',
+              firstname: firebaseUser.displayName?.split(" ")[0] || "",
+              lastname:
+                firebaseUser.displayName?.split(" ").slice(1).join(" ") || "",
+              displayName: firebaseUser.displayName || "",
+              role:
+                userType === "freelancer"
+                  ? "freelancer"
+                  : userType === "client"
+                  ? "client"
+                  : "client",
+              title: "",
+              overview: "",
+              hourRate: "$ 0",
+              photoURL: firebaseUser.photoURL || "",
               isActive: true,
-              isVerified: firebaseUser.emailVerified,
-              accountStatus: 'active',
+              isVerified: true, // Google users are pre-verified
+              accountStatus: "active",
               createdAt: now,
               updatedAt: now,
               lastLoginAt: now,
               about: {
-                streetAddress: '',
-                city: '',
-                state: '',
-                country: '',
-                zipCode: '',
-                tel: '',
-                dob: '',
-                profileUrl: '',
-                downloadLink: ''
+                streetAddress: "",
+                city: "",
+                state: "",
+                country: "",
+                zipCode: "",
+                tel: "",
+                dob: "",
+                profileUrl: "",
+                downloadLink: "",
               },
               skills: [],
               specialties: [],
@@ -1617,448 +1873,588 @@ export const firebaseApi = createApi({
                 totalReviews: 0,
                 responseRate: 0,
                 onTimeDelivery: 0,
-              repeatClients: 0
+                repeatClients: 0,
               },
               preferences: {
-                timezone: 'UTC',
-                language: 'en',
-                currency: 'USD',
+                timezone: "UTC",
+                language: "en",
+                currency: "USD",
                 emailNotifications: true,
                 pushNotifications: true,
-                availability: 'available'
-              }
-            }
-            
+                availability: "available",
+              },
+            };
+
             // For Firestore, we need to convert string timestamps back to Firestore Timestamps
             const firestoreUserData = {
               ...userData,
               createdAt: Timestamp.now(),
               updatedAt: Timestamp.now(),
               lastLoginAt: Timestamp.now(),
-            }
-            
-            await setDoc(doc(db, 'users', firebaseUser.uid), firestoreUserData)
-            
+            };
+
+            await setDoc(doc(db, "users", firebaseUser.uid), firestoreUserData);
+
             // Don't clean up progress data here - let the calling hook handle it
             // This preserves signup flow data for new Google users
-            
-            return { data: { user: userData, isNewUser: true } }
+
+            return { data: { user: userData, isNewUser: true } };
           }
         } catch (error: any) {
-          console.error('Google Signup Error:', error)
-          
+          console.error("Google Signup Error:", error);
+
           // Handle specific Google Auth errors
-          if (error.code === 'auth/popup-closed-by-user') {
-            return { error: { status: 'CUSTOM_ERROR', error: 'Authentication cancelled. Please try again.' } }
-          } else if (error.code === 'auth/popup-blocked') {
-            return { error: { status: 'CUSTOM_ERROR', error: 'Popup blocked. Please allow popups and try again.' } }
-          } else if (error.message?.includes('Cross-Origin-Opener-Policy')) {
-            return { error: { status: 'CUSTOM_ERROR', error: 'Browser security settings are blocking authentication. Please try again or use a different browser.' } }
-          } else if (error.code === 'auth/cancelled-popup-request') {
-            return { error: { status: 'CUSTOM_ERROR', error: 'Authentication request was cancelled. Please try again.' } }
+          if (error.code === "auth/popup-closed-by-user") {
+            return {
+              error: {
+                status: "CUSTOM_ERROR",
+                error: "Authentication cancelled. Please try again.",
+              },
+            };
+          } else if (error.code === "auth/popup-blocked") {
+            return {
+              error: {
+                status: "CUSTOM_ERROR",
+                error: "Popup blocked. Please allow popups and try again.",
+              },
+            };
+          } else if (error.message?.includes("Cross-Origin-Opener-Policy")) {
+            return {
+              error: {
+                status: "CUSTOM_ERROR",
+                error:
+                  "Browser security settings are blocking authentication. Please try again or use a different browser.",
+              },
+            };
+          } else if (error.code === "auth/cancelled-popup-request") {
+            return {
+              error: {
+                status: "CUSTOM_ERROR",
+                error:
+                  "Authentication request was cancelled. Please try again.",
+              },
+            };
           }
-          
-          return { error: { status: 'CUSTOM_ERROR', error: error.message } }
+
+          return { error: { status: "CUSTOM_ERROR", error: error.message } };
         }
       },
-      invalidatesTags: ['User'],
+      invalidatesTags: ["User"],
     }),
 
     // Onboarding Data Persistence Endpoints
-    updateUserSpecialties: builder.mutation<ApiResponse<User>, { userId: string; specialties: string[] }>({
+    updateUserSpecialties: builder.mutation<
+      ApiResponse<User>,
+      { userId: string; specialties: string[] }
+    >({
       queryFn: async ({ userId, specialties }) => {
         try {
-          const userRef = doc(db, 'users', userId)
-          await updateDoc(userRef, { 
+          const userRef = doc(db, "users", userId);
+          await updateDoc(userRef, {
             specialties,
-            updatedAt: Timestamp.now()
-          })
-          
+            updatedAt: Timestamp.now(),
+          });
+
           // Fetch updated user data
-          const updatedUser = await getDoc(userRef)
+          const updatedUser = await getDoc(userRef);
           if (!updatedUser.exists()) {
-            throw new Error('User not found')
+            throw new Error("User not found");
           }
-          
+
           const userData = serializeUser({ userId, ...updatedUser.data() });
-          
+
           // Return in the format RTK Query expects
-          return { 
+          return {
             data: {
               success: true,
               data: userData,
-              message: 'Specialties updated successfully' 
-            }
-          }
+              message: "Specialties updated successfully",
+            },
+          };
         } catch (error: any) {
-          return { 
-            error: { 
-              status: 'CUSTOM_ERROR', 
-              data: error.message 
-            }
-          }
+          return {
+            error: {
+              status: "CUSTOM_ERROR",
+              data: error.message,
+            },
+          };
         }
       },
-      invalidatesTags: ['User'],
+      invalidatesTags: ["User"],
     }),
 
-    updateUserEducation: builder.mutation<ApiResponse<User>, { userId: string; education: UserEducation[] }>({
+    updateUserEducation: builder.mutation<
+      ApiResponse<User>,
+      { userId: string; education: UserEducation[] }
+    >({
       queryFn: async ({ userId, education }) => {
         try {
-          const userRef = doc(db, 'users', userId)
-          await updateDoc(userRef, { 
+          const userRef = doc(db, "users", userId);
+          await updateDoc(userRef, {
             education,
-            updatedAt: Timestamp.now()
-          })
-          
-          const updatedUser = await getDoc(userRef)
+            updatedAt: Timestamp.now(),
+          });
+
+          const updatedUser = await getDoc(userRef);
           if (!updatedUser.exists()) {
-            throw new Error('User not found')
+            throw new Error("User not found");
           }
-          
-          return { data: { data: serializeUser({ userId, ...updatedUser.data() }), success: true, message: 'Education updated successfully' } }
+
+          return {
+            data: {
+              data: serializeUser({ userId, ...updatedUser.data() }),
+              success: true,
+              message: "Education updated successfully",
+            },
+          };
         } catch (error: any) {
-          return { error: { status: 'CUSTOM_ERROR', error: error.message } }
+          return { error: { status: "CUSTOM_ERROR", error: error.message } };
         }
       },
-      invalidatesTags: ['User'],
+      invalidatesTags: ["User"],
     }),
 
-    updateUserPortfolio: builder.mutation<ApiResponse<User>, { userId: string; portfolio: UserPortfolio[] }>({
+    updateUserPortfolio: builder.mutation<
+      ApiResponse<User>,
+      { userId: string; portfolio: UserPortfolio[] }
+    >({
       queryFn: async ({ userId, portfolio }) => {
         try {
-          const userRef = doc(db, 'users', userId)
-          await updateDoc(userRef, { 
+          const userRef = doc(db, "users", userId);
+          await updateDoc(userRef, {
             portfolio,
-            updatedAt: Timestamp.now()
-          })
-          
-          const updatedUser = await getDoc(userRef)
+            updatedAt: Timestamp.now(),
+          });
+
+          const updatedUser = await getDoc(userRef);
           if (!updatedUser.exists()) {
-            throw new Error('User not found')
+            throw new Error("User not found");
           }
-          
-          return { data: { data: serializeUser({ userId, ...updatedUser.data() }), success: true, message: 'Portfolio updated successfully' } }
+
+          return {
+            data: {
+              data: serializeUser({ userId, ...updatedUser.data() }),
+              success: true,
+              message: "Portfolio updated successfully",
+            },
+          };
         } catch (error: any) {
-          return { error: { status: 'CUSTOM_ERROR', error: error.message } }
+          return { error: { status: "CUSTOM_ERROR", error: error.message } };
         }
       },
-      invalidatesTags: ['User'],
+      invalidatesTags: ["User"],
     }),
 
-    updateUserEmployment: builder.mutation<ApiResponse<User>, { userId: string; employment: UserEmployment[] }>({
+    updateUserEmployment: builder.mutation<
+      ApiResponse<User>,
+      { userId: string; employment: UserEmployment[] }
+    >({
       queryFn: async ({ userId, employment }) => {
         try {
-          const userRef = doc(db, 'users', userId)
-          await updateDoc(userRef, { 
+          const userRef = doc(db, "users", userId);
+          await updateDoc(userRef, {
             employment,
-            updatedAt: Timestamp.now()
-          })
-          
-          const updatedUser = await getDoc(userRef)
+            updatedAt: Timestamp.now(),
+          });
+
+          const updatedUser = await getDoc(userRef);
           if (!updatedUser.exists()) {
-            throw new Error('User not found')
+            throw new Error("User not found");
           }
-          
-          return { data: { data: serializeUser({ userId, ...updatedUser.data() }), success: true, message: 'Employment updated successfully' } }
+
+          return {
+            data: {
+              data: serializeUser({ userId, ...updatedUser.data() }),
+              success: true,
+              message: "Employment updated successfully",
+            },
+          };
         } catch (error: any) {
-          return { error: { status: 'CUSTOM_ERROR', error: error.message } }
+          return { error: { status: "CUSTOM_ERROR", error: error.message } };
         }
       },
-      invalidatesTags: ['User'],
+      invalidatesTags: ["User"],
     }),
 
-    updateUserSkills: builder.mutation<ApiResponse<User>, { userId: string; skills: UserSkill[] }>({
+    updateUserSkills: builder.mutation<
+      ApiResponse<User>,
+      { userId: string; skills: UserSkill[] }
+    >({
       queryFn: async ({ userId, skills }) => {
         try {
-          const userRef = doc(db, 'users', userId)
-          await updateDoc(userRef, { 
+          const userRef = doc(db, "users", userId);
+          await updateDoc(userRef, {
             skills,
-            updatedAt: Timestamp.now()
-          })
-          
-          const updatedUser = await getDoc(userRef)
+            updatedAt: Timestamp.now(),
+          });
+
+          const updatedUser = await getDoc(userRef);
           if (!updatedUser.exists()) {
-            throw new Error('User not found')
+            throw new Error("User not found");
           }
-          
-          return { data: { data: serializeUser({ userId, ...updatedUser.data() }), success: true, message: 'Skills updated successfully' } }
+
+          return {
+            data: {
+              data: serializeUser({ userId, ...updatedUser.data() }),
+              success: true,
+              message: "Skills updated successfully",
+            },
+          };
         } catch (error: any) {
-          return { error: { status: 'CUSTOM_ERROR', error: error.message } }
+          return { error: { status: "CUSTOM_ERROR", error: error.message } };
         }
       },
-      invalidatesTags: ['User'],
+      invalidatesTags: ["User"],
     }),
 
-    updateUserCertifications: builder.mutation<ApiResponse<User>, { userId: string; certifications: UserCertification[] }>({
+    updateUserCertifications: builder.mutation<
+      ApiResponse<User>,
+      { userId: string; certifications: UserCertification[] }
+    >({
       queryFn: async ({ userId, certifications }) => {
         try {
-          const userRef = doc(db, 'users', userId)
-          await updateDoc(userRef, { 
+          const userRef = doc(db, "users", userId);
+          await updateDoc(userRef, {
             certifications,
-            updatedAt: Timestamp.now()
-          })
-          
-          const updatedUser = await getDoc(userRef)
+            updatedAt: Timestamp.now(),
+          });
+
+          const updatedUser = await getDoc(userRef);
           if (!updatedUser.exists()) {
-            throw new Error('User not found')
+            throw new Error("User not found");
           }
-          
-          return { data: { data: serializeUser({ userId, ...updatedUser.data() }), success: true, message: 'Certifications updated successfully' } }
+
+          return {
+            data: {
+              data: serializeUser({ userId, ...updatedUser.data() }),
+              success: true,
+              message: "Certifications updated successfully",
+            },
+          };
         } catch (error: any) {
-          return { error: { status: 'CUSTOM_ERROR', error: error.message } }
+          return { error: { status: "CUSTOM_ERROR", error: error.message } };
         }
       },
-      invalidatesTags: ['User'],
+      invalidatesTags: ["User"],
     }),
 
-    updateUserRates: builder.mutation<ApiResponse<User>, { userId: string; hourRate: string; title: string; overview: string }>({
+    updateUserRates: builder.mutation<
+      ApiResponse<User>,
+      { userId: string; hourRate: string; title: string; overview: string }
+    >({
       queryFn: async ({ userId, hourRate, title, overview }) => {
         try {
-          const userRef = doc(db, 'users', userId)
-          await updateDoc(userRef, { 
+          const userRef = doc(db, "users", userId);
+          await updateDoc(userRef, {
             hourRate,
             title,
             overview,
-            updatedAt: Timestamp.now()
-          })
-          
-          const updatedUser = await getDoc(userRef)
+            updatedAt: Timestamp.now(),
+          });
+
+          const updatedUser = await getDoc(userRef);
           if (!updatedUser.exists()) {
-            throw new Error('User not found')
+            throw new Error("User not found");
           }
-          
-          return { data: { data: serializeUser({ userId, ...updatedUser.data() }), success: true, message: 'Profile updated successfully' } }
+
+          return {
+            data: {
+              data: serializeUser({ userId, ...updatedUser.data() }),
+              success: true,
+              message: "Profile updated successfully",
+            },
+          };
         } catch (error: any) {
-          return { error: { status: 'CUSTOM_ERROR', error: error.message } }
+          return { error: { status: "CUSTOM_ERROR", error: error.message } };
         }
       },
-      invalidatesTags: ['User'],
+      invalidatesTags: ["User"],
     }),
 
-    updateUserLocationAndProfile: builder.mutation<ApiResponse<User>, {
-      userId: string;
-      locationData: {
-        country: string;
-        countryCode: string;
-        city: string;
-        timezone: string;
-        primaryLanguage: string;
-        additionalLanguages: string[];
-        phoneNumber?: string;
-        dateOfBirth?: string;
-        bio?: string;
-        linkedinUrl?: string;
-        websiteUrl?: string;
-        githubUrl?: string;
-        profileImageUrl?: string;
-      };
-    }>({
+    updateUserLocationAndProfile: builder.mutation<
+      ApiResponse<User>,
+      {
+        userId: string;
+        locationData: {
+          country: string;
+          countryCode: string;
+          city: string;
+          timezone: string;
+          primaryLanguage: string;
+          additionalLanguages: string[];
+          phoneNumber?: string;
+          dateOfBirth?: string;
+          bio?: string;
+          linkedinUrl?: string;
+          websiteUrl?: string;
+          githubUrl?: string;
+          profileImageUrl?: string;
+        };
+      }
+    >({
       queryFn: async ({ userId, locationData }) => {
         try {
-          const userRef = doc(db, 'users', userId)
-          
+          const userRef = doc(db, "users", userId);
+
           // Prepare the update data
           const updateData: any = {
             updatedAt: Timestamp.now(),
-            'about.country': locationData.country,
-            'about.countryCode': locationData.countryCode,
-            'about.city': locationData.city,
-            'about.timezone': locationData.timezone,
-            'about.primaryLanguage': locationData.primaryLanguage,
-            'about.additionalLanguages': locationData.additionalLanguages,
-            'preferences.timezone': locationData.timezone,
-            'preferences.language': locationData.primaryLanguage,
-          }
+            "about.country": locationData.country,
+            "about.countryCode": locationData.countryCode,
+            "about.city": locationData.city,
+            "about.timezone": locationData.timezone,
+            "about.primaryLanguage": locationData.primaryLanguage,
+            "about.additionalLanguages": locationData.additionalLanguages,
+            "preferences.timezone": locationData.timezone,
+            "preferences.language": locationData.primaryLanguage,
+          };
 
           // Add optional fields if provided
           if (locationData.phoneNumber) {
-            updateData['about.tel'] = locationData.phoneNumber
+            updateData["about.tel"] = locationData.phoneNumber;
           }
           if (locationData.dateOfBirth) {
-            updateData['about.dateOfBirth'] = locationData.dateOfBirth
-            updateData['about.dob'] = locationData.dateOfBirth // Keep both for compatibility
+            updateData["about.dateOfBirth"] = locationData.dateOfBirth;
+            updateData["about.dob"] = locationData.dateOfBirth; // Keep both for compatibility
           }
           if (locationData.bio) {
-            updateData['about.bio'] = locationData.bio
+            updateData["about.bio"] = locationData.bio;
           }
           if (locationData.linkedinUrl) {
-            updateData['about.linkedinUrl'] = locationData.linkedinUrl
+            updateData["about.linkedinUrl"] = locationData.linkedinUrl;
           }
           if (locationData.websiteUrl) {
-            updateData['about.websiteUrl'] = locationData.websiteUrl
+            updateData["about.websiteUrl"] = locationData.websiteUrl;
           }
           if (locationData.githubUrl) {
-            updateData['about.githubUrl'] = locationData.githubUrl
+            updateData["about.githubUrl"] = locationData.githubUrl;
           }
           if (locationData.profileImageUrl) {
-            updateData.photoURL = locationData.profileImageUrl
-            updateData['about.profileUrl'] = locationData.profileImageUrl // Keep both in sync
+            updateData.photoURL = locationData.profileImageUrl;
+            updateData["about.profileUrl"] = locationData.profileImageUrl; // Keep both in sync
           }
 
-          await updateDoc(userRef, updateData)
-          
-          const updatedUser = await getDoc(userRef)
+          await updateDoc(userRef, updateData);
+
+          const updatedUser = await getDoc(userRef);
           if (!updatedUser.exists()) {
-            throw new Error('User not found')
+            throw new Error("User not found");
           }
-          
-          return { data: { data: serializeUser({ userId, ...updatedUser.data() }), success: true, message: 'Location and profile updated successfully' } }
+
+          return {
+            data: {
+              data: serializeUser({ userId, ...updatedUser.data() }),
+              success: true,
+              message: "Location and profile updated successfully",
+            },
+          };
         } catch (error: any) {
-          return { error: { status: 'CUSTOM_ERROR', error: error.message } }
+          return { error: { status: "CUSTOM_ERROR", error: error.message } };
         }
       },
-      invalidatesTags: ['User'],
+      invalidatesTags: ["User"],
     }),
 
     // Get user onboarding data
     getUserOnboardingData: builder.query<User, string>({
       queryFn: async (userId) => {
         try {
-          const userDoc = await getDoc(doc(db, 'users', userId))
+          const userDoc = await getDoc(doc(db, "users", userId));
           if (!userDoc.exists()) {
-            throw new Error('User not found')
+            throw new Error("User not found");
           }
-          
-          return { data: serializeUser({ userId, ...userDoc.data() }) }
+
+          return { data: serializeUser({ userId, ...userDoc.data() }) };
         } catch (error: any) {
-          return { error: { status: 'CUSTOM_ERROR', error: error.message } }
+          return { error: { status: "CUSTOM_ERROR", error: error.message } };
         }
       },
-      providesTags: ['User'],
+      providesTags: ["User"],
     }),
-    
+
     // Get all freelancers with pagination and filters
-    getFreelancers: builder.query<PaginatedResponse<User>, {
-      page?: number;
-      pageSize?: number;
-      lastVisible?: any;
-      filters?: {
-        searchQuery?: string;
-        category?: string;
-        location?: string;
-        experienceLevel?: string;
-        minRate?: number;
-        maxRate?: number;
-        skills?: string[];
-      };
-      sortBy?: 'rating' | 'completedJobs' | 'hourRate' | 'hourRateDesc' | 'reviewCount' | 'bestMatch';
-    }>({
-      queryFn: async ({ page = 1, pageSize = 10, lastVisible = null, filters = {}, sortBy = 'bestMatch' }) => {
+    getFreelancers: builder.query<
+      PaginatedResponse<User>,
+      {
+        page?: number;
+        pageSize?: number;
+        lastVisible?: any;
+        filters?: {
+          searchQuery?: string;
+          category?: string;
+          location?: string;
+          experienceLevel?: string;
+          minRate?: number;
+          maxRate?: number;
+          skills?: string[];
+        };
+        sortBy?:
+          | "rating"
+          | "completedJobs"
+          | "hourRate"
+          | "hourRateDesc"
+          | "reviewCount"
+          | "bestMatch";
+      }
+    >({
+      queryFn: async ({
+        page = 1,
+        pageSize = 10,
+        lastVisible = null,
+        filters = {},
+        sortBy = "bestMatch",
+      }) => {
         try {
           // Start with basic query of all freelancers - simplify the query to avoid errors
-          let userQuery = query(
-            collection(db, 'users')
-          );
-          
+          let userQuery = query(collection(db, "users"));
+
           // We'll apply filtering in memory to avoid Firestore limitations
           const querySnapshot = await getDocs(userQuery);
           let freelancers: User[] = [];
-          
+
           // Transform documents into User objects
-          querySnapshot.forEach(doc => {
+          querySnapshot.forEach((doc) => {
             const userData = doc.data();
             // Only include users with 'freelancer' role
-            if (userData.role === 'freelancer') {
+            if (userData.role === "freelancer") {
               freelancers.push(serializeUser({ userId: doc.id, ...userData }));
             }
           });
-          
+
           // Client-side filtering for all filters
           // Filter by search query (check name, title, skills, etc.)
           if (filters.searchQuery) {
             const search = filters.searchQuery.toLowerCase();
-            freelancers = freelancers.filter(freelancer => 
-              (freelancer.displayName || '').toLowerCase().includes(search) ||
-              (freelancer.title || '').toLowerCase().includes(search) ||
-              (freelancer.overview || '').toLowerCase().includes(search) ||
-              freelancer.skills?.some(skill => (skill.text || '').toLowerCase().includes(search))
+            freelancers = freelancers.filter(
+              (freelancer) =>
+                (freelancer.displayName || "").toLowerCase().includes(search) ||
+                (freelancer.title || "").toLowerCase().includes(search) ||
+                (freelancer.overview || "").toLowerCase().includes(search) ||
+                freelancer.skills?.some((skill) =>
+                  (skill.text || "").toLowerCase().includes(search)
+                )
             );
           }
-          
+
           // Filter by location
-          if (filters.location && filters.location !== 'All Locations') {
-            freelancers = freelancers.filter(freelancer => {
-              if (filters.location === 'Remote Only') {
-                return freelancer.about?.country === 'Remote';
+          if (filters.location && filters.location !== "All Locations") {
+            freelancers = freelancers.filter((freelancer) => {
+              if (filters.location === "Remote Only") {
+                return freelancer.about?.country === "Remote";
               } else {
                 return freelancer.about?.country === filters.location;
               }
             });
           }
-          
+
           // Filter by experience level
-          if (filters.experienceLevel && filters.experienceLevel !== 'All Levels') {
-            freelancers = freelancers.filter(freelancer => 
-              freelancer.skills?.some(skill => 
-                skill.level?.toLowerCase() === filters.experienceLevel?.toLowerCase()
+          if (
+            filters.experienceLevel &&
+            filters.experienceLevel !== "All Levels"
+          ) {
+            freelancers = freelancers.filter((freelancer) =>
+              freelancer.skills?.some(
+                (skill) =>
+                  skill.level?.toLowerCase() ===
+                  filters.experienceLevel?.toLowerCase()
               )
             );
           }
-          
+
           // Filter by category/specialty
-          if (filters.category && filters.category !== 'All Categories') {
-            freelancers = freelancers.filter(freelancer =>
-              freelancer.specialties?.some(specialty => 
-                specialty.includes(filters.category || '')
-              ) ||
-              freelancer.skills?.some(skill => 
-                (skill.text || '').toLowerCase().includes((filters.category || '').toLowerCase())
-              )
+          if (filters.category && filters.category !== "All Categories") {
+            freelancers = freelancers.filter(
+              (freelancer) =>
+                freelancer.specialties?.some((specialty) =>
+                  specialty.includes(filters.category || "")
+                ) ||
+                freelancer.skills?.some((skill) =>
+                  (skill.text || "")
+                    .toLowerCase()
+                    .includes((filters.category || "").toLowerCase())
+                )
             );
           }
-          
+
           // Filter by hourly rate range
-          if (typeof filters.minRate === 'number') {
-            freelancers = freelancers.filter(freelancer => {
+          if (typeof filters.minRate === "number") {
+            freelancers = freelancers.filter((freelancer) => {
               // Extract numeric value from hourRate string (e.g., "$ 20" -> 20)
-              const rate = freelancer.hourRate ? parseFloat(freelancer.hourRate.replace(/[^0-9.]/g, '')) : 0;
+              const rate = freelancer.hourRate
+                ? parseFloat(freelancer.hourRate.replace(/[^0-9.]/g, ""))
+                : 0;
               return rate >= filters.minRate!;
             });
           }
-          
-          if (typeof filters.maxRate === 'number') {
-            freelancers = freelancers.filter(freelancer => {
-              const rate = freelancer.hourRate ? parseFloat(freelancer.hourRate.replace(/[^0-9.]/g, '')) : 0;
+
+          if (typeof filters.maxRate === "number") {
+            freelancers = freelancers.filter((freelancer) => {
+              const rate = freelancer.hourRate
+                ? parseFloat(freelancer.hourRate.replace(/[^0-9.]/g, ""))
+                : 0;
               return rate <= filters.maxRate!;
             });
           }
-          
+
           // Apply sorting
-          if (sortBy === 'rating') {
-            freelancers.sort((a, b) => (b.stats?.averageRating || 0) - (a.stats?.averageRating || 0));
-          } else if (sortBy === 'completedJobs') {
-            freelancers.sort((a, b) => (b.stats?.completedJobs || 0) - (a.stats?.completedJobs || 0));
-          } else if (sortBy === 'hourRate') {
+          if (sortBy === "rating") {
+            freelancers.sort(
+              (a, b) =>
+                (b.stats?.averageRating || 0) - (a.stats?.averageRating || 0)
+            );
+          } else if (sortBy === "completedJobs") {
+            freelancers.sort(
+              (a, b) =>
+                (b.stats?.completedJobs || 0) - (a.stats?.completedJobs || 0)
+            );
+          } else if (sortBy === "hourRate") {
             freelancers.sort((a, b) => {
-              const rateA = a.hourRate ? parseFloat(a.hourRate.replace(/[^0-9.]/g, '')) : 0;
-              const rateB = b.hourRate ? parseFloat(b.hourRate.replace(/[^0-9.]/g, '')) : 0;
+              const rateA = a.hourRate
+                ? parseFloat(a.hourRate.replace(/[^0-9.]/g, ""))
+                : 0;
+              const rateB = b.hourRate
+                ? parseFloat(b.hourRate.replace(/[^0-9.]/g, ""))
+                : 0;
               return rateA - rateB;
             });
-          } else if (sortBy === 'hourRateDesc') {
+          } else if (sortBy === "hourRateDesc") {
             freelancers.sort((a, b) => {
-              const rateA = a.hourRate ? parseFloat(a.hourRate.replace(/[^0-9.]/g, '')) : 0;
-              const rateB = b.hourRate ? parseFloat(b.hourRate.replace(/[^0-9.]/g, '')) : 0;
+              const rateA = a.hourRate
+                ? parseFloat(a.hourRate.replace(/[^0-9.]/g, ""))
+                : 0;
+              const rateB = b.hourRate
+                ? parseFloat(b.hourRate.replace(/[^0-9.]/g, ""))
+                : 0;
               return rateB - rateA;
             });
-          } else if (sortBy === 'reviewCount') {
-            freelancers.sort((a, b) => (b.stats?.totalReviews || 0) - (a.stats?.totalReviews || 0));
+          } else if (sortBy === "reviewCount") {
+            freelancers.sort(
+              (a, b) =>
+                (b.stats?.totalReviews || 0) - (a.stats?.totalReviews || 0)
+            );
           } else {
             // bestMatch - sort by a combination of rating and jobs completed
             freelancers.sort((a, b) => {
-              const scoreA = (a.stats?.averageRating || 0) * 0.6 + (a.stats?.completedJobs || 0) * 0.4 / 100;
-              const scoreB = (b.stats?.averageRating || 0) * 0.6 + (b.stats?.completedJobs || 0) * 0.4 / 100;
+              const scoreA =
+                (a.stats?.averageRating || 0) * 0.6 +
+                ((a.stats?.completedJobs || 0) * 0.4) / 100;
+              const scoreB =
+                (b.stats?.averageRating || 0) * 0.6 +
+                ((b.stats?.completedJobs || 0) * 0.4) / 100;
               return scoreB - scoreA;
             });
           }
-          
+
           // Apply pagination
           const totalItems = freelancers.length;
           const startIndex = (page - 1) * pageSize;
-          const paginatedFreelancers = freelancers.slice(startIndex, startIndex + pageSize);
-          
+          const paginatedFreelancers = freelancers.slice(
+            startIndex,
+            startIndex + pageSize
+          );
+
           // Return the final result
-          return { 
+          return {
             data: {
               items: paginatedFreelancers,
               pagination: {
@@ -2066,119 +2462,946 @@ export const firebaseApi = createApi({
                 pageSize: pageSize,
                 totalItems: totalItems,
                 hasMore: startIndex + pageSize < totalItems,
-                lastVisible: null // Not needed for client-side pagination
-              }
-            } 
+                lastVisible: null, // Not needed for client-side pagination
+              },
+            },
           };
         } catch (error: any) {
           console.error("Error fetching freelancers:", error);
-          return { error: { status: 'CUSTOM_ERROR', error: error.message || "Failed to fetch freelancers" } };
+          return {
+            error: {
+              status: "CUSTOM_ERROR",
+              error: error.message || "Failed to fetch freelancers",
+            },
+          };
         }
       },
-      providesTags: ['User'],
+      providesTags: ["User"],
     }),
 
     // Get complete user profile data
     getUserProfile: builder.query<User, string>({
       queryFn: async (userId) => {
         try {
-          const userDoc = await getDoc(doc(db, 'users', userId))
+          const userDoc = await getDoc(doc(db, "users", userId));
           if (!userDoc.exists()) {
-            throw new Error('User not found')
+            throw new Error("User not found");
           }
-          
-          return { data: serializeUser({ userId, ...userDoc.data() }) }
+
+          return { data: serializeUser({ userId, ...userDoc.data() }) };
         } catch (error: any) {
-          return { error: { status: 'CUSTOM_ERROR', error: error.message } }
+          return { error: { status: "CUSTOM_ERROR", error: error.message } };
         }
       },
-      providesTags: ['User'],
+      providesTags: ["User"],
     }),
 
     // Update comprehensive user profile
-    updateUserProfile: builder.mutation<ApiResponse<User>, {
-      userId: string;
-      profileData: Partial<User>;
-    }>({
+    updateUserProfile: builder.mutation<
+      ApiResponse<User>,
+      {
+        userId: string;
+        profileData: Partial<User>;
+      }
+    >({
       queryFn: async ({ userId, profileData }) => {
         try {
-          const userRef = doc(db, 'users', userId)
-          
+          const userRef = doc(db, "users", userId);
+
           // Update the document with new data
           await updateDoc(userRef, {
             ...profileData,
-            updatedAt: new Date().toISOString()
-          })
-          
+            updatedAt: new Date().toISOString(),
+          });
+
           // Get the updated user data
-          const updatedDoc = await getDoc(userRef)
+          const updatedDoc = await getDoc(userRef);
           if (!updatedDoc.exists()) {
-            throw new Error('Failed to retrieve updated user data')
+            throw new Error("Failed to retrieve updated user data");
           }
-          
-          const updatedUser = serializeUser({ userId, ...updatedDoc.data() })
-          
+
+          const updatedUser = serializeUser({ userId, ...updatedDoc.data() });
+
           return {
             data: {
               success: true,
-              message: 'Profile updated successfully',
-              data: updatedUser
-            }
-          }
+              message: "Profile updated successfully",
+              data: updatedUser,
+            },
+          };
         } catch (error: any) {
-          return { error: { status: 'CUSTOM_ERROR', error: error.message } }
+          return { error: { status: "CUSTOM_ERROR", error: error.message } };
         }
       },
-      invalidatesTags: ['User'],
+      invalidatesTags: ["User"],
     }),
-    
+
     /**
      * Update a user's profile image in both photoURL and about.profileUrl fields
      */
-    updateUserProfileImage: builder.mutation<ApiResponse<User>, {
-      userId: string;
-      imageUrl: string;
-    }>({
+    updateUserProfileImage: builder.mutation<
+      ApiResponse<User>,
+      {
+        userId: string;
+        imageUrl: string;
+      }
+    >({
       queryFn: async ({ userId, imageUrl }) => {
         try {
-          const userRef = doc(db, 'users', userId)
-          
+          const userRef = doc(db, "users", userId);
+
           // Update both photoURL and about.profileUrl for consistency
           await updateDoc(userRef, {
             photoURL: imageUrl,
-            'about.profileUrl': imageUrl,
-            updatedAt: new Date().toISOString()
-          })
-          
+            "about.profileUrl": imageUrl,
+            updatedAt: new Date().toISOString(),
+          });
+
           // Get the updated user data
-          const updatedDoc = await getDoc(userRef)
+          const updatedDoc = await getDoc(userRef);
           if (!updatedDoc.exists()) {
-            throw new Error('Failed to retrieve updated user data')
+            throw new Error("Failed to retrieve updated user data");
           }
-          
-          const updatedUser = serializeUser({ userId, ...updatedDoc.data() })
-          
+
+          const updatedUser = serializeUser({ userId, ...updatedDoc.data() });
+
           // If the user is also authenticated with Firebase Auth, update that profile too
-          const currentUser = auth.currentUser
+          const currentUser = auth.currentUser;
           if (currentUser && currentUser.uid === userId) {
-            await updateProfile(currentUser, { photoURL: imageUrl })
+            await updateProfile(currentUser, { photoURL: imageUrl });
           }
-          
+
           return {
             data: {
               success: true,
-              message: 'Profile image updated successfully',
-              data: updatedUser
-            }
-          }
+              message: "Profile image updated successfully",
+              data: updatedUser,
+            },
+          };
         } catch (error: any) {
-          return { error: { status: 'CUSTOM_ERROR', error: error.message } }
+          return { error: { status: "CUSTOM_ERROR", error: error.message } };
         }
       },
-      invalidatesTags: ['User'],
+      invalidatesTags: ["User"],
+    }),
+
+    // Contract queries
+    getFreelancerContracts: builder.query<Contract[], string>({
+      async queryFn(freelancerId) {
+        try {
+          const contractsRef = collection(db, "contracts");
+          const q = query(
+            contractsRef,
+            where("freelancerId", "==", freelancerId),
+            orderBy("createdAt", "desc")
+          );
+
+          const snapshot = await getDocs(q);
+          const contracts = snapshot.docs.map((doc) => ({
+            contractId: doc.id,
+            ...doc.data(),
+            createdAt: doc.data().createdAt?.toDate().toISOString(),
+            updatedAt: doc.data().updatedAt?.toDate().toISOString(),
+            completedAt: doc.data().completedAt?.toDate().toISOString(),
+            terms: {
+              ...doc.data().terms,
+              startDate: doc.data().terms?.startDate?.toDate().toISOString(),
+              endDate: doc.data().terms?.endDate?.toDate().toISOString(),
+            },
+            milestones:
+              doc.data().milestones?.map((m: any) => ({
+                ...m,
+                dueDate: m.dueDate?.toDate().toISOString(),
+                submittedAt: m.submittedAt?.toDate().toISOString(),
+                approvedAt: m.approvedAt?.toDate().toISOString(),
+                revisionRequestedAt: m.revisionRequestedAt
+                  ?.toDate()
+                  .toISOString(),
+              })) || [],
+          })) as Contract[];
+
+          return { data: contracts };
+        } catch (error: any) {
+          return { error: { status: "CUSTOM_ERROR", error: error.message } };
+        }
+      },
+      providesTags: ["Contract"],
+    }),
+
+    // Payment queries
+    getFreelancerPayments: builder.query<Payment[], string>({
+      async queryFn(freelancerId) {
+        try {
+          const paymentsRef = collection(db, "payments");
+          const q = query(
+            paymentsRef,
+            where("freelancerId", "==", freelancerId),
+            orderBy("createdAt", "desc")
+          );
+
+          const snapshot = await getDocs(q);
+          const payments = snapshot.docs.map((doc) => {
+            const data = doc.data();
+            return {
+              paymentId: doc.id,
+              ...data,
+              createdAt: data.createdAt?.toDate().toISOString(),
+              processedAt: data.processedAt?.toDate().toISOString(),
+              completedAt: data.completedAt?.toDate().toISOString(),
+              escrow: {
+                ...data.escrow,
+                releasedAt: data.escrow?.releasedAt?.toDate().toISOString(),
+              },
+            };
+          }) as Payment[];
+
+          return { data: payments };
+        } catch (error: any) {
+          return { error: { status: "CUSTOM_ERROR", error: error.message } };
+        }
+      },
+      providesTags: ["Payment"],
+    }),
+
+    // Recent conversations query for dashboard
+    getRecentConversations: builder.query<
+      Conversation[],
+      { userId: string; limit: number }
+    >({
+      async queryFn({ userId, limit: limitCount }) {
+        try {
+          const conversationsRef = collection(db, "conversations");
+          const q = query(
+            conversationsRef,
+            where("participants", "array-contains", userId),
+            orderBy("updatedAt", "desc"),
+            limit(limitCount)
+          );
+
+          const snapshot = await getDocs(q);
+          const conversations = await Promise.all(
+            snapshot.docs.map(async (docSnap) => {
+              const data = docSnap.data();
+
+              // Get the other participant's info
+              const otherParticipantId = data.participants?.find(
+                (p: string) => p !== userId
+              );
+              let participantName = "User";
+              let participantAvatar = "/placeholder-user.jpg";
+
+              if (otherParticipantId) {
+                try {
+                  const userDoc = await getDoc(
+                    doc(db, "users", otherParticipantId)
+                  );
+                  if (userDoc.exists()) {
+                    const userData = userDoc.data();
+                    participantName =
+                      userData.displayName || userData.email || "User";
+                    participantAvatar =
+                      userData.photoURL || "/placeholder-user.jpg";
+                  }
+                } catch (error) {
+                  console.error("Error fetching participant data:", error);
+                }
+              }
+
+              return {
+                conversationId: docSnap.id,
+                ...data,
+                participantName,
+                participantAvatar,
+                createdAt: data.createdAt?.toDate().toISOString(),
+                updatedAt: data.updatedAt?.toDate().toISOString(),
+                lastMessage: {
+                  ...data.lastMessage,
+                  timestamp: data.lastMessage?.timestamp
+                    ?.toDate()
+                    .toISOString(),
+                },
+              } as any;
+            })
+          );
+
+          return { data: conversations };
+        } catch (error: any) {
+          return { error: { status: "CUSTOM_ERROR", error: error.message } };
+        }
+      },
+      providesTags: ["Conversation"],
+    }),
+
+    // Get proposals with project info
+    getProposalsWithProjects: builder.query<any[], { freelancerId: string }>({
+      async queryFn({ freelancerId }) {
+        try {
+          const proposalsRef = collection(db, "proposals");
+          const q = query(
+            proposalsRef,
+            where("freelancerId", "==", freelancerId),
+            orderBy("submittedAt", "desc"),
+            limit(10)
+          );
+
+          const snapshot = await getDocs(q);
+          const proposalsWithProjects = await Promise.all(
+            snapshot.docs.map(async (docSnap) => {
+              const proposalData = docSnap.data();
+
+              // Fetch the associated project
+              let projectTitle = "Project";
+              try {
+                const projectsQuery = query(
+                  collection(db, "projects"),
+                  where("projectId", "==", proposalData.projectId),
+                  limit(1)
+                );
+                const projectSnapshot = await getDocs(projectsQuery);
+                if (!projectSnapshot.empty) {
+                  const projectData = projectSnapshot.docs[0].data();
+                  projectTitle = projectData.title || "Project";
+                }
+              } catch (error) {
+                console.error("Error fetching project:", error);
+              }
+
+              return {
+                proposalId: docSnap.id,
+                ...proposalData,
+                projectTitle,
+                submittedAt: proposalData.submittedAt?.toDate().toISOString(),
+                updatedAt: proposalData.updatedAt?.toDate().toISOString(),
+                respondedAt: proposalData.respondedAt?.toDate().toISOString(),
+                bid: {
+                  ...proposalData.bid,
+                  deliveryDate: proposalData.bid?.deliveryDate?.toDate
+                    ? proposalData.bid.deliveryDate.toDate().toISOString()
+                    : proposalData.bid?.deliveryDate,
+                },
+              };
+            })
+          );
+
+          return { data: proposalsWithProjects };
+        } catch (error: any) {
+          return { error: { status: "CUSTOM_ERROR", error: error.message } };
+        }
+      },
+      providesTags: ["Proposal"],
+    }),
+
+    // Review mutations
+    createReview: builder.mutation<
+      { reviewId: string },
+      {
+        contractId: string;
+        projectId: string;
+        reviewerId: string;
+        revieweeId: string;
+        type: "client_to_freelancer" | "freelancer_to_client";
+        rating: {
+          overall: number;
+          communication: number;
+          quality: number;
+          timeliness: number;
+          professionalism: number;
+        };
+        feedback: string;
+        isPublic: boolean;
+        isRecommended: boolean;
+      }
+    >({
+      async queryFn(reviewData) {
+        try {
+          const reviewsRef = collection(db, "reviews");
+          const reviewId = doc(reviewsRef).id;
+
+          const review = {
+            reviewId,
+            ...reviewData,
+            response: {
+              text: "",
+              respondedAt: null,
+            },
+            createdAt: Timestamp.now(),
+            updatedAt: Timestamp.now(),
+          };
+
+          await setDoc(doc(db, "reviews", reviewId), review);
+
+          // Update freelancer stats if client is reviewing freelancer
+          if (reviewData.type === "client_to_freelancer") {
+            const freelancerRef = doc(db, "users", reviewData.revieweeId);
+            const freelancerDoc = await getDoc(freelancerRef);
+
+            if (freelancerDoc.exists()) {
+              const freelancerData = freelancerDoc.data();
+              const currentTotalReviews =
+                freelancerData.stats?.totalReviews || 0;
+              const currentAverageRating =
+                freelancerData.stats?.averageRating || 0;
+
+              const newTotalReviews = currentTotalReviews + 1;
+              const newAverageRating =
+                (currentAverageRating * currentTotalReviews +
+                  reviewData.rating.overall) /
+                newTotalReviews;
+
+              await updateDoc(freelancerRef, {
+                "stats.totalReviews": newTotalReviews,
+                "stats.averageRating": Math.round(newAverageRating * 10) / 10,
+                updatedAt: Timestamp.now(),
+              });
+            }
+          }
+
+          return { data: { reviewId } };
+        } catch (error: any) {
+          return { error: { status: "CUSTOM_ERROR", error: error.message } };
+        }
+      },
+      invalidatesTags: ["Review"],
+    }),
+
+    updateReview: builder.mutation<
+      { reviewId: string },
+      {
+        reviewId: string;
+        contractId?: string;
+        projectId?: string;
+        reviewerId?: string;
+        revieweeId?: string;
+        type?: "client_to_freelancer" | "freelancer_to_client";
+        rating?: {
+          overall: number;
+          communication: number;
+          quality: number;
+          timeliness: number;
+          professionalism: number;
+        };
+        feedback?: string;
+        isPublic?: boolean;
+        isRecommended?: boolean;
+        response?: {
+          text: string;
+          respondedAt: string;
+        };
+      }
+    >({
+      async queryFn({ reviewId, ...reviewData }) {
+        try {
+          const reviewRef = doc(db, "reviews", reviewId);
+          const oldReviewDoc = await getDoc(reviewRef);
+
+          await updateDoc(reviewRef, {
+            ...reviewData,
+            updatedAt: Timestamp.now(),
+          });
+
+          // Update freelancer stats only if rating is being updated
+          if (
+            reviewData.rating &&
+            reviewData.type === "client_to_freelancer" &&
+            reviewData.revieweeId &&
+            oldReviewDoc.exists()
+          ) {
+            const oldRating = oldReviewDoc.data().rating.overall;
+            const newRating = reviewData.rating.overall;
+
+            if (oldRating !== newRating) {
+              const freelancerRef = doc(db, "users", reviewData.revieweeId);
+              const freelancerDoc = await getDoc(freelancerRef);
+
+              if (freelancerDoc.exists()) {
+                const freelancerData = freelancerDoc.data();
+                const totalReviews = freelancerData.stats?.totalReviews || 1;
+                const currentAverageRating =
+                  freelancerData.stats?.averageRating || 0;
+
+                // Recalculate average: remove old rating, add new rating
+                const newAverageRating =
+                  (currentAverageRating * totalReviews -
+                    oldRating +
+                    newRating) /
+                  totalReviews;
+
+                await updateDoc(freelancerRef, {
+                  "stats.averageRating": Math.round(newAverageRating * 10) / 10,
+                  updatedAt: Timestamp.now(),
+                });
+              }
+            }
+          }
+
+          return { data: { reviewId } };
+        } catch (error: any) {
+          return { error: { status: "CUSTOM_ERROR", error: error.message } };
+        }
+      },
+      invalidatesTags: ["Review"],
+    }),
+
+    // Get review by contract
+    getReviewByContract: builder.query<
+      any,
+      { contractId: string; reviewerId: string }
+    >({
+      async queryFn({ contractId, reviewerId }) {
+        try {
+          const reviewsRef = collection(db, "reviews");
+          const q = query(
+            reviewsRef,
+            where("contractId", "==", contractId),
+            where("reviewerId", "==", reviewerId),
+            limit(1)
+          );
+
+          const snapshot = await getDocs(q);
+
+          if (snapshot.empty) {
+            return { data: null };
+          }
+
+          const doc = snapshot.docs[0];
+          const docData = doc.data();
+
+          const review = {
+            reviewId: doc.id,
+            ...docData,
+            createdAt: docData.createdAt?.toDate?.()
+              ? docData.createdAt.toDate().toISOString()
+              : docData.createdAt,
+            updatedAt: docData.updatedAt?.toDate?.()
+              ? docData.updatedAt.toDate().toISOString()
+              : docData.updatedAt,
+            response: docData.response
+              ? {
+                  text: docData.response.text || "",
+                  respondedAt: docData.response.respondedAt?.toDate?.()
+                    ? docData.response.respondedAt.toDate().toISOString()
+                    : docData.response.respondedAt || null,
+                }
+              : { text: "", respondedAt: null },
+          };
+
+          return { data: review };
+        } catch (error: any) {
+          return { error: { status: "CUSTOM_ERROR", error: error.message } };
+        }
+      },
+      providesTags: ["Review"],
+    }),
+
+    // Get freelancer review stats (calculated in real-time)
+    getFreelancerReviewsStats: builder.query<
+      { averageRating: number; totalReviews: number },
+      string
+    >({
+      async queryFn(freelancerId) {
+        try {
+          const reviewsRef = collection(db, "reviews");
+          const q = query(
+            reviewsRef,
+            where("revieweeId", "==", freelancerId),
+            where("type", "==", "client_to_freelancer")
+          );
+
+          const snapshot = await getDocs(q);
+
+          if (snapshot.empty) {
+            return { data: { averageRating: 0, totalReviews: 0 } };
+          }
+
+          let totalRating = 0;
+          const reviews = snapshot.docs.map((doc) => doc.data());
+
+          reviews.forEach((review: any) => {
+            totalRating += review.rating?.overall || 0;
+          });
+
+          const averageRating = totalRating / reviews.length;
+
+          return {
+            data: {
+              averageRating: Math.round(averageRating * 10) / 10,
+              totalReviews: reviews.length,
+            },
+          };
+        } catch (error: any) {
+          return { error: { status: "CUSTOM_ERROR", error: error.message } };
+        }
+      },
+      providesTags: ["Review"],
+    }),
+
+    // Get freelancer profile completion rate
+    getFreelancerProfileCompletion: builder.query<
+      {
+        completionRate: number;
+        sections: {
+          basicInfo: { completed: boolean; weight: number };
+          skills: { completed: boolean; weight: number };
+          portfolio: { completed: boolean; weight: number };
+          education: { completed: boolean; weight: number };
+          employment: { completed: boolean; weight: number };
+          certifications: { completed: boolean; weight: number };
+          hourlyRate: { completed: boolean; weight: number };
+          bio: { completed: boolean; weight: number };
+          location: { completed: boolean; weight: number };
+          socialLinks: { completed: boolean; weight: number };
+        };
+        completedSections: number;
+        totalSections: number;
+      },
+      string
+    >({
+      async queryFn(userId) {
+        try {
+          const userRef = doc(db, "users", userId);
+          const userDoc = await getDoc(userRef);
+
+          if (!userDoc.exists()) {
+            throw new Error("User not found");
+          }
+
+          const userData = userDoc.data();
+
+          // Define profile sections with weights (importance)
+          // Total weight: 100%
+          const sections = {
+            basicInfo: {
+              completed: !!(
+                userData.firstname &&
+                userData.lastname &&
+                userData.title &&
+                userData.overview
+              ),
+              weight: 15,
+            },
+            skills: {
+              completed: !!(userData.skills && userData.skills.length >= 3),
+              weight: 15,
+            },
+            portfolio: {
+              completed: !!(
+                userData.portfolio && userData.portfolio.length >= 1
+              ),
+              weight: 15,
+            },
+            education: {
+              completed: !!(
+                userData.education && userData.education.length >= 1
+              ),
+              weight: 10,
+            },
+            employment: {
+              completed: !!(
+                userData.employment && userData.employment.length >= 1
+              ),
+              weight: 10,
+            },
+            certifications: {
+              completed: !!(
+                userData.certifications && userData.certifications.length >= 1
+              ),
+              weight: 10,
+            },
+            hourlyRate: {
+              completed: !!(
+                userData.hourRate &&
+                userData.hourRate !== "$ 0" &&
+                userData.hourRate !== "$0"
+              ),
+              weight: 10,
+            },
+            bio: {
+              completed: !!(
+                userData.overview && userData.overview.length >= 50
+              ),
+              weight: 5,
+            },
+            location: {
+              completed: !!(
+                userData.about?.country &&
+                userData.about?.city &&
+                userData.about?.timezone
+              ),
+              weight: 5,
+            },
+            socialLinks: {
+              completed: !!(
+                userData.about?.linkedinUrl ||
+                userData.about?.websiteUrl ||
+                userData.about?.githubUrl
+              ),
+              weight: 5,
+            },
+          };
+
+          // Calculate completion rate
+          let totalWeight = 0;
+          let completedWeight = 0;
+          let completedSections = 0;
+          const totalSections = Object.keys(sections).length;
+
+          Object.values(sections).forEach((section) => {
+            totalWeight += section.weight;
+            if (section.completed) {
+              completedWeight += section.weight;
+              completedSections++;
+            }
+          });
+
+          const completionRate = Math.round(
+            (completedWeight / totalWeight) * 100
+          );
+
+          return {
+            data: {
+              completionRate,
+              sections,
+              completedSections,
+              totalSections,
+            },
+          };
+        } catch (error: any) {
+          return { error: { status: "CUSTOM_ERROR", error: error.message } };
+        }
+      },
+      providesTags: ["User"],
+    }),
+
+    // Client Dashboard Queries
+    // Get client's contracts (active and completed)
+    getClientContracts: builder.query<Contract[], string>({
+      async queryFn(clientId) {
+        try {
+          const contractsRef = collection(db, "contracts");
+          const q = query(
+            contractsRef,
+            where("clientId", "==", clientId),
+            orderBy("createdAt", "desc")
+          );
+
+          const snapshot = await getDocs(q);
+          const contracts = snapshot.docs.map((doc) => ({
+            contractId: doc.id,
+            ...doc.data(),
+            createdAt: doc.data().createdAt?.toDate().toISOString(),
+            updatedAt: doc.data().updatedAt?.toDate().toISOString(),
+            completedAt: doc.data().completedAt?.toDate().toISOString(),
+            terms: {
+              ...doc.data().terms,
+              startDate: doc.data().terms?.startDate?.toDate().toISOString(),
+              endDate: doc.data().terms?.endDate?.toDate().toISOString(),
+            },
+            milestones:
+              doc.data().milestones?.map((m: any) => ({
+                ...m,
+                dueDate: m.dueDate?.toDate().toISOString(),
+                submittedAt: m.submittedAt?.toDate().toISOString(),
+                approvedAt: m.approvedAt?.toDate().toISOString(),
+                revisionRequestedAt: m.revisionRequestedAt
+                  ?.toDate()
+                  .toISOString(),
+              })) || [],
+          })) as Contract[];
+
+          return { data: contracts };
+        } catch (error: any) {
+          return { error: { status: "CUSTOM_ERROR", error: error.message } };
+        }
+      },
+      providesTags: ["Contract"],
+    }),
+
+    // Get client's payments (total spent)
+    getClientPayments: builder.query<Payment[], string>({
+      async queryFn(clientId) {
+        try {
+          const paymentsRef = collection(db, "payments");
+          const q = query(
+            paymentsRef,
+            where("clientId", "==", clientId),
+            orderBy("createdAt", "desc")
+          );
+
+          const snapshot = await getDocs(q);
+          const payments = snapshot.docs.map((doc) => {
+            const data = doc.data();
+            return {
+              paymentId: doc.id,
+              ...data,
+              createdAt: data.createdAt?.toDate().toISOString(),
+              processedAt: data.processedAt?.toDate().toISOString(),
+              completedAt: data.completedAt?.toDate().toISOString(),
+              escrow: {
+                ...data.escrow,
+                releasedAt: data.escrow?.releasedAt?.toDate().toISOString(),
+              },
+            };
+          }) as Payment[];
+
+          return { data: payments };
+        } catch (error: any) {
+          return { error: { status: "CUSTOM_ERROR", error: error.message } };
+        }
+      },
+      providesTags: ["Payment"],
+    }),
+
+    // Get proposals for client's projects with freelancer info
+    getClientProposals: builder.query<
+      any[],
+      { clientId: string; limit?: number }
+    >({
+      async queryFn({ clientId, limit: limitCount = 10 }) {
+        try {
+          // First, get all projects by this client
+          const projectsRef = collection(db, "projects");
+          const projectsQuery = query(
+            projectsRef,
+            where("clientId", "==", clientId)
+          );
+          const projectsSnapshot = await getDocs(projectsQuery);
+          const projectIds = projectsSnapshot.docs.map((doc) => doc.id);
+
+          if (projectIds.length === 0) {
+            return { data: [] };
+          }
+
+          // Get proposals for these projects
+          const proposalsRef = collection(db, "proposals");
+          const proposalsQuery = query(
+            proposalsRef,
+            where("projectId", "in", projectIds.slice(0, 10)), // Firestore 'in' limit is 10
+            orderBy("submittedAt", "desc"),
+            limit(limitCount)
+          );
+
+          const proposalsSnapshot = await getDocs(proposalsQuery);
+
+          const proposalsWithDetails = await Promise.all(
+            proposalsSnapshot.docs.map(async (docSnap) => {
+              const proposalData = docSnap.data();
+
+              // Fetch freelancer info
+              let freelancerName = "Freelancer";
+              let freelancerAvatar = "/placeholder-user.jpg";
+              let freelancerRating = 0;
+              let freelancerCompletedJobs = 0;
+
+              try {
+                const freelancerDoc = await getDoc(
+                  doc(db, "users", proposalData.freelancerId)
+                );
+                if (freelancerDoc.exists()) {
+                  const freelancerData = freelancerDoc.data();
+                  freelancerName =
+                    freelancerData.displayName ||
+                    freelancerData.email ||
+                    "Freelancer";
+                  freelancerAvatar =
+                    freelancerData.photoURL || "/placeholder-user.jpg";
+                  freelancerRating = freelancerData.stats?.averageRating || 0;
+                  freelancerCompletedJobs =
+                    freelancerData.stats?.completedJobs || 0;
+                }
+              } catch (error) {
+                console.error("Error fetching freelancer data:", error);
+              }
+
+              // Fetch project title
+              let projectTitle = "Project";
+              try {
+                const projectDoc = await getDoc(
+                  doc(db, "projects", proposalData.projectId)
+                );
+                if (projectDoc.exists()) {
+                  projectTitle = projectDoc.data().title || "Project";
+                }
+              } catch (error) {
+                console.error("Error fetching project:", error);
+              }
+
+              return {
+                proposalId: docSnap.id,
+                ...proposalData,
+                freelancerName,
+                freelancerAvatar,
+                freelancerRating,
+                freelancerCompletedJobs,
+                projectTitle,
+                submittedAt: proposalData.submittedAt?.toDate().toISOString(),
+                updatedAt: proposalData.updatedAt?.toDate().toISOString(),
+                respondedAt: proposalData.respondedAt?.toDate().toISOString(),
+                bid: {
+                  ...proposalData.bid,
+                  deliveryDate: proposalData.bid?.deliveryDate?.toDate
+                    ? proposalData.bid.deliveryDate.toDate().toISOString()
+                    : proposalData.bid?.deliveryDate,
+                },
+              };
+            })
+          );
+
+          return { data: proposalsWithDetails };
+        } catch (error: any) {
+          return { error: { status: "CUSTOM_ERROR", error: error.message } };
+        }
+      },
+      providesTags: ["Proposal"],
+    }),
+
+    // Get count of freelancers hired by client (accepted proposals)
+    getClientHiredFreelancersCount: builder.query<number, string>({
+      async queryFn(clientId) {
+        try {
+          // Get all client's projects
+          const projectsRef = collection(db, "projects");
+          const projectsQuery = query(
+            projectsRef,
+            where("clientId", "==", clientId)
+          );
+          const projectsSnapshot = await getDocs(projectsQuery);
+          const projectIds = projectsSnapshot.docs.map((doc) => doc.id);
+
+          if (projectIds.length === 0) {
+            return { data: 0 };
+          }
+
+          // Count unique freelancers from accepted proposals
+          const uniqueFreelancers = new Set<string>();
+
+          // Process in batches of 10 due to Firestore 'in' query limit
+          for (let i = 0; i < projectIds.length; i += 10) {
+            const batch = projectIds.slice(i, i + 10);
+            const proposalsRef = collection(db, "proposals");
+            const proposalsQuery = query(
+              proposalsRef,
+              where("projectId", "in", batch),
+              where("status", "==", "accepted")
+            );
+            const proposalsSnapshot = await getDocs(proposalsQuery);
+
+            proposalsSnapshot.docs.forEach((doc) => {
+              const freelancerId = doc.data().freelancerId;
+              if (freelancerId) {
+                uniqueFreelancers.add(freelancerId);
+              }
+            });
+          }
+
+          return { data: uniqueFreelancers.size };
+        } catch (error: any) {
+          return { error: { status: "CUSTOM_ERROR", error: error.message } };
+        }
+      },
+      providesTags: ["Proposal"],
     }),
   }),
-})
+});
 
 export const {
   useLoginMutation,
@@ -2217,4 +3440,24 @@ export const {
   useUpdateUserProfileMutation,
   // Freelancer search hooks
   useGetFreelancersQuery,
-} = firebaseApi
+  // Contract hooks
+  useGetFreelancerContractsQuery,
+  // Payment hooks
+  useGetFreelancerPaymentsQuery,
+  // Conversation hooks
+  useGetRecentConversationsQuery,
+  // Proposal hooks with projects
+  useGetProposalsWithProjectsQuery,
+  // Profile completion hooks
+  useGetFreelancerProfileCompletionQuery,
+  // Review hooks
+  useCreateReviewMutation,
+  useUpdateReviewMutation,
+  useGetReviewByContractQuery,
+  useGetFreelancerReviewsStatsQuery,
+  // Client dashboard hooks
+  useGetClientContractsQuery,
+  useGetClientPaymentsQuery,
+  useGetClientProposalsQuery,
+  useGetClientHiredFreelancersCountQuery,
+} = firebaseApi;
