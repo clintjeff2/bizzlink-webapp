@@ -11,6 +11,7 @@ import {
   orderBy,
   getDocs,
   onSnapshot,
+  limit,
 } from "firebase/firestore";
 import { db } from "@/firebase";
 import { format } from "date-fns";
@@ -41,6 +42,7 @@ import {
   XCircle,
   AlertTriangle,
   FileText,
+  Star,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -51,6 +53,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
+import { RateFreelancerModal } from "@/components/modals/rate-freelancer-modal";
+import { useGetReviewByContractQuery } from "@/lib/redux/api/firebaseApi";
 
 interface Contract {
   id: string;
@@ -111,6 +115,22 @@ export default function ClientContractsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [activeTab, setActiveTab] = useState("all");
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [selectedContract, setSelectedContract] = useState<Contract | null>(
+    null
+  );
+  const [contractReviews, setContractReviews] = useState<Record<string, any>>(
+    {}
+  );
+
+  // Get existing review for the selected contract
+  const { data: existingReview } = useGetReviewByContractQuery(
+    {
+      contractId: selectedContract?.id || "",
+      reviewerId: user?.userId || "",
+    },
+    { skip: !selectedContract?.id || !user?.userId }
+  );
 
   // Fetch all user's contracts
   useEffect(() => {
@@ -208,6 +228,36 @@ export default function ClientContractsPage() {
           }
 
           setContracts(contractsData);
+
+          // Fetch reviews for all contracts
+          const reviewsMap: Record<string, any> = {};
+          for (const contract of contractsData) {
+            try {
+              const reviewsRef = collection(db, "reviews");
+              const reviewQuery = query(
+                reviewsRef,
+                where("contractId", "==", contract.id),
+                where("reviewerId", "==", user.userId),
+                limit(1)
+              );
+              const reviewSnapshot = await getDocs(reviewQuery);
+
+              if (!reviewSnapshot.empty) {
+                reviewsMap[contract.id] = {
+                  reviewId: reviewSnapshot.docs[0].id,
+                  ...reviewSnapshot.docs[0].data(),
+                };
+              }
+            } catch (err) {
+              console.error(
+                "Error fetching review for contract:",
+                contract.id,
+                err
+              );
+            }
+          }
+          setContractReviews(reviewsMap);
+
           setLoading(false);
         } catch (err: any) {
           console.error("Error processing contracts:", err);
@@ -462,10 +512,41 @@ export default function ClientContractsPage() {
                           )}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button size="sm" variant="ghost" className="h-8">
-                            <ArrowUpRight className="h-4 w-4 mr-1" />
-                            View
-                          </Button>
+                          <div
+                            className="flex items-center justify-end gap-2"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {(contract.status === "active" ||
+                              contract.status === "completed") && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedContract(contract);
+                                  setShowRatingModal(true);
+                                }}
+                              >
+                                <Star className="h-4 w-4 mr-1" />
+                                {contractReviews[contract.id]
+                                  ? "Edit Review"
+                                  : "Rate Freelancer"}
+                              </Button>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                viewContract(contract.id);
+                              }}
+                            >
+                              <ArrowUpRight className="h-4 w-4 mr-1" />
+                              View
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -476,6 +557,24 @@ export default function ClientContractsPage() {
           </div>
         )}
       </div>
+
+      {/* Rate Freelancer Modal */}
+      {selectedContract && (
+        <RateFreelancerModal
+          isOpen={showRatingModal}
+          onClose={() => {
+            setShowRatingModal(false);
+            setSelectedContract(null);
+          }}
+          contractId={selectedContract.id}
+          projectId={selectedContract.projectId}
+          freelancerId={selectedContract.freelancerId}
+          freelancerName={selectedContract.freelancerName || "Freelancer"}
+          freelancerPhotoURL={selectedContract.freelancerAvatar}
+          clientId={user?.userId || ""}
+          existingReview={existingReview}
+        />
+      )}
     </div>
   );
 }
