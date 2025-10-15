@@ -1,45 +1,45 @@
 /**
  * Bizzlink Firebase Database Types
- * 
+ *
  * This file contains all TypeScript interfaces for Firebase Firestore collections.
  * These types ensure consistency between web and mobile applications.
- * 
+ *
  * @version 1.0.0
  * @lastUpdated 2025-08-26
  */
 
-import { Timestamp } from 'firebase/firestore'
+import { Timestamp } from "firebase/firestore";
 
 // =============================================================================
 // USER TYPES
 // =============================================================================
 
 export interface User {
-  userId: string;                    // Firebase Auth UID
+  userId: string; // Firebase Auth UID
   email: string;
   emailVerified: boolean;
   firstname: string;
   lastname: string;
-  displayName: string;               // computed: firstname + lastname
-    role: 'client' | 'admin' | 'freelancer'
-  title: string;                     // Professional title
-  overview: string;                  // Bio/description
-  hourRate: string;                  // e.g., "$ 20"
-  photoURL: string;                  // Profile image URL
+  displayName: string; // computed: firstname + lastname
+  role: "client" | "admin" | "freelancer";
+  title: string; // Professional title
+  overview: string; // Bio/description
+  hourRate: string; // e.g., "$ 20"
+  photoURL: string; // Profile image URL
   isActive: boolean;
-  isVerified: boolean;               // Identity verification
-  paymentVerified?: boolean;         // Payment method verification
-  phoneVerified?: boolean;           // Phone number verification
+  isVerified: boolean; // Identity verification
+  paymentVerified?: boolean; // Payment method verification
+  phoneVerified?: boolean; // Phone number verification
   accountStatus: "active" | "suspended" | "pending";
-  createdAt: string;                 // ISO string instead of Timestamp
-  updatedAt: string;                 // ISO string instead of Timestamp
-  lastLoginAt: string;               // ISO string instead of Timestamp
-  
+  createdAt: string; // ISO string instead of Timestamp
+  updatedAt: string; // ISO string instead of Timestamp
+  lastLoginAt: string; // ISO string instead of Timestamp
+
   // Professional Links
   websiteUrl?: string;
   linkedinUrl?: string;
   githubUrl?: string;
-  
+
   // Additional profile data
   languages?: Array<{
     language: string;
@@ -54,20 +54,20 @@ export interface User {
     credentialId: string;
     credentialUrl?: string;
   }>;
-  
+
   // Personal Information
   about: UserAboutInfo;
-  
+
   // Professional Info (for service providers)
   skills: UserSkill[];
-  specialties: string[];             // Array of specialty categories
+  specialties: string[]; // Array of specialty categories
   education: UserEducation[];
   employment: UserEmployment[];
   portfolio: UserPortfolio[];
-  
+
   // Statistics
   stats: UserStats;
-  
+
   // Preferences
   preferences: UserPreferences;
 }
@@ -79,23 +79,23 @@ export interface UserAboutInfo {
   country: string;
   zipCode: string;
   tel: string;
-  dob: string;                       // ISO date
+  dob: string; // ISO date
   profileUrl: string;
   downloadLink: string;
-  bio?: string;                      // Personal bio/description
-  timezone?: string;                 // User's timezone
-  
+  bio?: string; // Personal bio/description
+  timezone?: string; // User's timezone
+
   // Professional Links
   websiteUrl?: string;
   linkedinUrl?: string;
   githubUrl?: string;
-  
+
   // Client-specific Company Information
-  companyName?: string;              // Company name for clients
-  industry?: string;                 // Industry for clients
-  companySize?: string;              // Company size for clients
-  companyDescription?: string;       // Company description for clients
-  
+  companyName?: string; // Company name for clients
+  industry?: string; // Industry for clients
+  companySize?: string; // Company size for clients
+  companyDescription?: string; // Company description for clients
+
   // Languages
   primaryLanguage?: string;
   additionalLanguages?: Array<{
@@ -129,9 +129,9 @@ export interface UserEmployment {
   city: string;
   country: string;
   startDate: string;
-  endDate: string;                   // "Present" for current
+  endDate: string; // "Present" for current
   description: string;
-  current?: boolean;                 // true if currently employed here
+  current?: boolean; // true if currently employed here
 }
 
 export interface UserCertification {
@@ -163,13 +163,13 @@ export interface UserStats {
   completedJobs: number;
   activeProjects: number;
   totalEarnings: number;
-  totalSpent: number;                // For clients
+  totalSpent: number; // For clients
   averageRating: number;
   totalReviews: number;
   responseRate: number;
   onTimeDelivery: number;
   repeatClients: number;
-  hirRate?: number;                  // For clients - hire rate percentage
+  hirRate?: number; // For clients - hire rate percentage
 }
 
 export interface UserPreferences {
@@ -189,10 +189,10 @@ export interface Project {
   projectId: string;
   title: string;
   description: string;
-  detailedRequirements?: string;      // Detailed requirements and specifications
+  detailedRequirements?: string; // Detailed requirements and specifications
   category: string;
   subcategory: string;
-  clientId: string;                  // Reference to users collection
+  clientId: string; // Reference to users collection
   clientInfo: ProjectClientInfo;
   budget: ProjectBudget;
   timeline: ProjectTimeline;
@@ -200,12 +200,12 @@ export interface Project {
   status: "draft" | "active" | "in_progress" | "completed" | "cancelled";
   visibility: "public" | "private" | "invited_only";
   proposalCount: number;
-  hiredFreelancerId: string;         // When project is awarded
+  hiredFreelancerId: string; // When project is awarded
   milestones: ProjectMilestone[];
-  createdAt: string;                 // ISO string instead of Timestamp
-  updatedAt: string;                 // ISO string instead of Timestamp
-  publishedAt: string | null;        // ISO string instead of Timestamp
-  closedAt: string | null;           // ISO string instead of Timestamp
+  createdAt: string; // ISO string instead of Timestamp
+  updatedAt: string; // ISO string instead of Timestamp
+  publishedAt: string | null; // ISO string instead of Timestamp
+  closedAt: string | null; // ISO string instead of Timestamp
 }
 
 export interface ProjectClientInfo {
@@ -218,14 +218,14 @@ export interface ProjectBudget {
   type: "fixed" | "hourly";
   amount: number;
   currency: string;
-  minAmount: number;                 // For hourly projects
+  minAmount: number; // For hourly projects
   maxAmount: number;
 }
 
 export interface ProjectTimeline {
-  duration: string;                  // "1 week", "2 months", etc.
-  startDate: string;                 // ISO string instead of Timestamp
-  endDate: string;                   // ISO string instead of Timestamp
+  duration: string; // "1 week", "2 months", etc.
+  startDate: string; // ISO string instead of Timestamp
+  endDate: string; // ISO string instead of Timestamp
   isUrgent: boolean;
 }
 
@@ -241,7 +241,7 @@ export interface ProjectAttachment {
   fileName: string;
   fileUrl: string;
   fileType: string;
-  uploadedAt: string;               // ISO string instead of Timestamp
+  uploadedAt: string; // ISO string instead of Timestamp
 }
 
 export interface ProjectMilestone {
@@ -249,7 +249,7 @@ export interface ProjectMilestone {
   title: string;
   description: string;
   amount: number;
-  dueDate: string;                   // ISO string instead of Timestamp
+  dueDate: string; // ISO string instead of Timestamp
   status: "pending" | "in_progress" | "completed" | "approved";
   deliverables: string[];
 }
@@ -313,7 +313,7 @@ export interface Contract {
   freelancerId: string;
   terms: ContractTerms;
   status: "active" | "paused" | "completed" | "cancelled" | "disputed";
-  progress: number;                  // 0-100
+  progress: number; // 0-100
   milestones: ContractMilestone[];
   timeTracking: ContractTimeTracking;
   createdAt: Timestamp;
@@ -352,10 +352,10 @@ export interface ContractTimeTracking {
 
 export interface Conversation {
   conversationId: string;
-  participants: string[];           // Array of user IDs
+  participants: string[]; // Array of user IDs
   type: "project_inquiry" | "contract_discussion" | "general";
-  projectId?: string;               // Optional, if related to project
-  contractId?: string;              // Optional, if related to contract
+  projectId?: string; // Optional, if related to project
+  contractId?: string; // Optional, if related to contract
   lastMessage: ConversationLastMessage;
   unreadCount: Record<string, number>; // userId -> unread count
   isArchived: boolean;
@@ -396,8 +396,8 @@ export interface Review {
   reviewId: string;
   contractId: string;
   projectId: string;
-  reviewerId: string;               // Who is giving the review
-  revieweeId: string;               // Who is being reviewed
+  reviewerId: string; // Who is giving the review
+  revieweeId: string; // Who is being reviewed
   type: "client_to_freelancer" | "freelancer_to_client";
   rating: ReviewRating;
   feedback: string;
@@ -409,7 +409,7 @@ export interface Review {
 }
 
 export interface ReviewRating {
-  overall: number;                  // 1-5
+  overall: number; // 1-5
   communication: number;
   quality: number;
   timeliness: number;
@@ -432,7 +432,7 @@ export interface Payment {
   clientId: string;
   freelancerId: string;
   amount: PaymentAmount;
-  status: "pending" | "escrowed" | "released" | "refunded" | "failed";
+  status: "pending" | "escrowed" | "completed" | "refunded" | "failed";
   type: "milestone" | "hourly" | "bonus" | "refund";
   paymentMethod: PaymentMethod;
   escrow: PaymentEscrow;
@@ -466,7 +466,11 @@ export interface PaymentEscrow {
 export interface Notification {
   notificationId: string;
   userId: string;
-  type: "project_posted" | "proposal_received" | "payment_released" | "message_received";
+  type:
+    | "project_posted"
+    | "proposal_received"
+    | "payment_released"
+    | "message_received";
   title: string;
   message: string;
   data: NotificationData;
@@ -575,7 +579,7 @@ export interface UpdateProjectData {
   budget?: Partial<ProjectBudget>;
   timeline?: Partial<ProjectTimeline>;
   requirements?: Partial<ProjectRequirements>;
-  status?: Project['status'];
+  status?: Project["status"];
 }
 
 // Proposal-related types
@@ -590,7 +594,7 @@ export interface CreateProposalData {
 export interface UpdateProposalData {
   bid?: Partial<ProposalBid>;
   coverLetter?: string;
-  status?: Proposal['status'];
+  status?: Proposal["status"];
 }
 
 // Contract-related types
@@ -604,7 +608,7 @@ export interface CreateContractData {
 
 export interface UpdateContractData {
   terms?: Partial<ContractTerms>;
-  status?: Contract['status'];
+  status?: Contract["status"];
   progress?: number;
 }
 
@@ -612,13 +616,13 @@ export interface UpdateContractData {
 export interface CreateMessageData {
   conversationId: string;
   text: string;
-  type?: Message['type'];
+  type?: Message["type"];
   attachments?: MessageAttachment[];
 }
 
 export interface CreateConversationData {
   participants: string[];
-  type: Conversation['type'];
+  type: Conversation["type"];
   projectId?: string;
   contractId?: string;
 }
@@ -628,7 +632,7 @@ export interface CreateReviewData {
   contractId: string;
   projectId: string;
   revieweeId: string;
-  type: Review['type'];
+  type: Review["type"];
   rating: ReviewRating;
   feedback: string;
   isPublic: boolean;
@@ -638,27 +642,27 @@ export interface CreateReviewData {
 // Query parameter types
 export interface ProjectQueryParams {
   limit?: number;
-  status?: Project['status'];
+  status?: Project["status"];
   category?: string;
   skills?: string[];
   minBudget?: number;
   maxBudget?: number;
-  experienceLevel?: ProjectRequirements['experienceLevel'];
-  location?: ProjectRequirements['location'];
+  experienceLevel?: ProjectRequirements["experienceLevel"];
+  location?: ProjectRequirements["location"];
   lastDoc?: any;
 }
 
 export interface ProposalQueryParams {
   projectId?: string;
   freelancerId?: string;
-  status?: Proposal['status'];
+  status?: Proposal["status"];
   limit?: number;
 }
 
 export interface ContractQueryParams {
   clientId?: string;
   freelancerId?: string;
-  status?: Contract['status'];
+  status?: Contract["status"];
   limit?: number;
 }
 
@@ -670,7 +674,7 @@ export interface MessageQueryParams {
 
 export interface ConversationQueryParams {
   userId: string;
-  type?: Conversation['type'];
+  type?: Conversation["type"];
   limit?: number;
 }
 
@@ -678,15 +682,15 @@ export interface ConversationQueryParams {
 // UTILITY TYPES
 // =============================================================================
 
-export type UserRole = User['role'];
-export type ProjectStatus = Project['status'];
-export type ProposalStatus = Proposal['status'];
-export type ContractStatus = Contract['status'];
-export type PaymentStatus = Payment['status'];
-export type MessageType = Message['type'];
-export type ConversationType = Conversation['type'];
-export type ReviewType = Review['type'];
-export type NotificationType = Notification['type'];
+export type UserRole = User["role"];
+export type ProjectStatus = Project["status"];
+export type ProposalStatus = Proposal["status"];
+export type ContractStatus = Contract["status"];
+export type PaymentStatus = Payment["status"];
+export type MessageType = Message["type"];
+export type ConversationType = Conversation["type"];
+export type ReviewType = Review["type"];
+export type NotificationType = Notification["type"];
 
 // Firebase document with ID
 export type FirebaseDocument<T> = T & { id: string };
@@ -695,7 +699,17 @@ export type FirebaseDocument<T> = T & { id: string };
 export type PartialUpdate<T> = Partial<T> & { updatedAt: Timestamp };
 
 // Create data types (without system fields)
-export type CreateData<T> = Omit<T, 'createdAt' | 'updatedAt' | keyof { [K in keyof T]: T[K] extends string ? K : never }[keyof T] extends `${string}Id` ? keyof T : never>;
+export type CreateData<T> = Omit<
+  T,
+
+    | "createdAt"
+    | "updatedAt"
+    | keyof {
+        [K in keyof T]: T[K] extends string ? K : never;
+      }[keyof T] extends `${string}Id`
+    ? keyof T
+    : never
+>;
 
 // Response wrapper for API calls
 export interface ApiResponse<T> {
