@@ -441,7 +441,8 @@ interface User {
     totalSpent: number; // For clients
     averageRating: number;
     totalReviews: number;
-    responseRate: number;
+    responseRate: number; // Deprecated - replaced by profileCompletionRate
+    profileCompletionRate: number; // 0-100, calculated from profile sections
     onTimeDelivery: number;
     repeatClients: number;
     hirRate: number; // For clients - hire rate percentage
@@ -459,11 +460,31 @@ interface User {
 }
 ```
 
+**Profile Completion Calculation**:
+
+The `profileCompletionRate` is calculated in real-time based on the following sections:
+
+| Section          | Weight | Requirements                                     |
+| ---------------- | ------ | ------------------------------------------------ |
+| Basic Info       | 15%    | First name, last name, title, and overview       |
+| Skills           | 15%    | At least 3 skills added                          |
+| Portfolio        | 15%    | At least 1 portfolio project                     |
+| Education        | 10%    | At least 1 education entry                       |
+| Employment       | 10%    | At least 1 work experience entry                 |
+| Certifications   | 10%    | At least 1 certification                         |
+| Hourly Rate      | 10%    | Hourly rate set (not $0)                         |
+| Professional Bio | 5%     | Overview with at least 50 characters             |
+| Location         | 5%     | Country, city, and timezone set                  |
+| Social Links     | 5%     | At least one link (LinkedIn, website, or GitHub) |
+
+**Total**: 100%
+
 **Key Features**:
 
 - Comprehensive user profiles for both clients and service providers
 - Professional information including skills, education, and portfolio
-- Statistics tracking for performance metrics
+- Statistics tracking for performance metrics including profile completion
+- Real-time profile completion calculation encouraging full profiles
 - Flexible preferences system
 
 ### 2. Projects Collection (`projects/{projectId}`)
@@ -977,7 +998,7 @@ interface Payment {
     currency: string;
   };
 
-  status: "pending" | "escrowed" | "released" | "refunded" | "failed";
+  status: "pending" | "escrowed" | "completed" | "refunded" | "failed";
   type: "milestone" | "hourly" | "bonus" | "refund";
 
   paymentMethod: {
