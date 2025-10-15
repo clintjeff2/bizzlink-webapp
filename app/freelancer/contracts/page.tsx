@@ -46,9 +46,12 @@ import {
   AlertTriangle,
   MessageSquare,
   Loader2,
+  Star,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
+import { ViewReviewModal } from "@/components/modals/view-review-modal";
+import { useGetReviewByContractQuery } from "@/lib/redux/api/firebaseApi";
 
 export default function FreelancerContractsPage() {
   const router = useRouter();
@@ -62,6 +65,17 @@ export default function FreelancerContractsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortBy, setSortBy] = useState("newest");
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [selectedContract, setSelectedContract] = useState<any | null>(null);
+
+  // Get review for selected contract
+  const { data: review } = useGetReviewByContractQuery(
+    {
+      contractId: selectedContract?.id || "",
+      reviewerId: selectedContract?.clientId || "",
+    },
+    { skip: !selectedContract?.id || !selectedContract?.clientId }
+  );
 
   // Fetch contracts and payments data
   useEffect(() => {
@@ -568,6 +582,21 @@ export default function FreelancerContractsPage() {
                           </Link>
                         </Button>
 
+                        {(contract.status === "active" ||
+                          contract.status === "completed") && (
+                          <Button
+                            variant="outline"
+                            className="text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50"
+                            onClick={() => {
+                              setSelectedContract(contract);
+                              setShowReviewModal(true);
+                            }}
+                          >
+                            <Star className="h-4 w-4 mr-2" />
+                            View Review
+                          </Button>
+                        )}
+
                         <Button variant="outline" asChild>
                           <Link href={`/messages?contract=${contract.id}`}>
                             <MessageSquare className="h-4 w-4 mr-2" />
@@ -600,6 +629,24 @@ export default function FreelancerContractsPage() {
           )}
         </div>
       </div>
+
+      {/* View Review Modal */}
+      {selectedContract && review && (
+        <ViewReviewModal
+          isOpen={showReviewModal}
+          onClose={() => {
+            setShowReviewModal(false);
+            setSelectedContract(null);
+          }}
+          review={review}
+          freelancerName={user?.displayName || "You"}
+          clientName={
+            clients.find((c) => c.userId === selectedContract.clientId)
+              ?.displayName || "Client"
+          }
+          canRespond={true}
+        />
+      )}
     </div>
   );
 }
