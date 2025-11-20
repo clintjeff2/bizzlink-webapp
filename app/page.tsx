@@ -345,7 +345,7 @@ const howItWorksSteps = [
     title: "Chat & Select",
     description: "Interview candidates and choose the perfect match",
     icon: MessageSquare,
-    color: "bg-purple-500",
+    color: "bg-cyan-500",
   },
   {
     title: "Secure Payment",
@@ -357,13 +357,13 @@ const howItWorksSteps = [
     title: "Work Delivery",
     description: "Freelancer completes milestones and delivers quality work",
     icon: Briefcase,
-    color: "bg-pink-500",
+    color: "bg-emerald-500",
   },
   {
     title: "Release Payment",
     description: "Review and approve work to release payment to freelancer",
     icon: Send,
-    color: "bg-teal-500",
+    color: "bg-blue-500",
   },
 ];
 
@@ -553,7 +553,7 @@ export default function HomePage() {
 
       {/* Hero Section */}
       <section className="relative overflow-hidden pt-24 pb-16 lg:pt-36 lg:pb-32">
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-600/10 via-purple-500/5 to-green-500/10"></div>
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-600/10 via-cyan-500/5 to-emerald-500/10"></div>
 
         {/* Background Pattern */}
         <div className="absolute inset-0 opacity-10">
@@ -585,7 +585,7 @@ export default function HomePage() {
                 </Badge>
                 <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold text-gray-900 mb-8">
                   Connect with <span className="text-blue-600">Expert</span>
-                  <span className="block mt-2 bg-gradient-to-r from-blue-600 via-purple-600 to-green-600 bg-clip-text text-transparent">
+                  <span className="block mt-2 bg-gradient-to-r from-blue-600 via-cyan-600 to-emerald-600 bg-clip-text text-transparent">
                     Freelancers
                   </span>
                 </h1>
@@ -605,7 +605,7 @@ export default function HomePage() {
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-12 pr-36 py-7 text-lg border-2 border-gray-200 rounded-full focus:border-blue-500 focus:ring-0 shadow-lg"
                   />
-                  <Button className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-full px-8 py-6 text-base font-medium">
+                  <Button className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white rounded-full px-8 py-6 text-base font-medium">
                     Search
                   </Button>
                 </div>
@@ -615,7 +615,7 @@ export default function HomePage() {
                   <Link href="/projects" className="w-full sm:w-auto">
                     <Button
                       size="lg"
-                      className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-10 py-7 rounded-full shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 w-full sm:w-auto font-medium text-base"
+                      className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white px-10 py-7 rounded-full shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 w-full sm:w-auto font-medium text-base"
                     >
                       <Briefcase className="w-5 h-5 mr-3" />
                       Find Work
@@ -650,7 +650,7 @@ export default function HomePage() {
                   style={{ animationDelay: "1s" }}
                 ></div>
                 <div
-                  className="absolute top-40 right-40 w-24 h-24 bg-purple-400 rounded-full opacity-20 animate-pulse"
+                  className="absolute top-40 right-40 w-24 h-24 bg-emerald-400 rounded-full opacity-20 animate-pulse"
                   style={{ animationDelay: "2s" }}
                 ></div>
 
@@ -1357,14 +1357,14 @@ export default function HomePage() {
           {/* Interactive Visual Workflow - Improved Version */}
           <div className="relative mb-28">
             {/* Central Flow Line */}
-            <div className="hidden lg:block absolute top-1/2 left-0 right-0 h-3 bg-gradient-to-r from-blue-500 via-purple-500 to-green-500 rounded-full transform -translate-y-1/2 z-0"></div>
+            <div className="hidden lg:block absolute top-1/2 left-0 right-0 h-3 bg-gradient-to-r from-blue-500 via-cyan-500 to-emerald-500 rounded-full transform -translate-y-1/2 z-0"></div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-8">
               {howItWorksSteps.map((step, index) => (
                 <div key={index} className="relative">
                   {/* Connection Dots (Visible on mobile) */}
                   {index < howItWorksSteps.length - 1 && (
-                    <div className="md:hidden absolute top-full left-1/2 w-0.5 h-8 bg-gradient-to-b from-purple-500 to-blue-500 transform -translate-x-1/2"></div>
+                    <div className="md:hidden absolute top-full left-1/2 w-0.5 h-8 bg-gradient-to-b from-cyan-500 to-blue-500 transform -translate-x-1/2"></div>
                   )}
 
                   {/* Card */}
@@ -1445,7 +1445,7 @@ export default function HomePage() {
                   </div>
 
                   <div className="flex items-start">
-                    <div className="flex-shrink-0 w-12 h-12 bg-purple-600 rounded-xl flex items-center justify-center mr-4">
+                    <div className="flex-shrink-0 w-12 h-12 bg-cyan-600 rounded-xl flex items-center justify-center mr-4">
                       <Briefcase className="w-6 h-6 text-white" />
                     </div>
                     <div>
@@ -1478,7 +1478,7 @@ export default function HomePage() {
                 </div>
               </div>
 
-              <div className="lg:col-span-7 bg-gradient-to-br from-blue-500 to-purple-600 p-8 lg:p-0 relative">
+              <div className="lg:col-span-7 bg-gradient-to-br from-blue-500 to-cyan-600 p-8 lg:p-0 relative">
                 <div className="h-full w-full flex items-center justify-center overflow-hidden">
                   <div className="relative w-full max-w-3xl p-8">
                     {/* Process Flow Diagram */}
@@ -1787,10 +1787,10 @@ export default function HomePage() {
 
             {/* Interactive feature highlight */}
             <div className="relative z-10 max-w-5xl mx-auto mt-20 px-4 sm:px-6 lg:px-8">
-              <div className="bg-gradient-to-br from-emerald-600/95 to-blue-600/95 rounded-2xl overflow-hidden shadow-2xl">
+              <div className="bg-gradient-to-br from-emerald-50 to-blue-50 rounded-2xl overflow-hidden shadow-lg border border-emerald-100">
                 <div className="relative py-12 px-8 md:py-16 md:px-12">
                   {/* Background pattern */}
-                  <div className="absolute inset-0 opacity-10">
+                  <div className="absolute inset-0 opacity-5">
                     <svg
                       width="100%"
                       height="100%"
@@ -1817,10 +1817,10 @@ export default function HomePage() {
                   <div className="relative">
                     <div className="flex flex-col md:flex-row md:items-center md:justify-between">
                       <div className="mb-8 md:mb-0 md:mr-8 md:max-w-xl">
-                        <h3 className="text-2xl md:text-3xl font-bold text-white mb-4">
+                        <h3 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-emerald-600 to-blue-600 bg-clip-text text-transparent mb-4">
                           Ready to experience the Bizzlink difference?
                         </h3>
-                        <p className="text-white/80">
+                        <p className="text-gray-600">
                           Join thousands of businesses and freelancers who are
                           already benefiting from our premium platform features.
                         </p>
@@ -1829,14 +1829,14 @@ export default function HomePage() {
                       <div className="flex space-x-4">
                         <Button
                           size="lg"
-                          className="bg-white hover:bg-gray-50 text-emerald-600 font-medium px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all"
+                          className="bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-700 hover:to-blue-700 text-white font-medium px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all"
                         >
                           Post a Project
                         </Button>
                         <Button
                           variant="outline"
                           size="lg"
-                          className="border-white text-emerald-600 hover:bg-white/10 font-medium px-6 py-3 rounded-xl"
+                          className="border-emerald-600 text-emerald-600 hover:bg-emerald-50 font-medium px-6 py-3 rounded-xl"
                         >
                           Find Work
                         </Button>
@@ -2409,7 +2409,7 @@ export default function HomePage() {
             <div className="relative hidden lg:block">
               <div className="absolute -top-10 -left-10 w-40 h-40 bg-cyan-400 rounded-full opacity-20 animate-pulse"></div>
               <div
-                className="absolute -bottom-8 -right-8 w-32 h-32 bg-purple-400 rounded-full opacity-20 animate-pulse"
+                className="absolute -bottom-8 -right-8 w-32 h-32 bg-emerald-400 rounded-full opacity-20 animate-pulse"
                 style={{ animationDelay: "1s" }}
               ></div>
 
