@@ -34,11 +34,11 @@ export default function ProjectDetailsPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-white">
         <Navigation />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex items-center justify-center h-64">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-blue"></div>
           </div>
         </div>
       </div>
@@ -47,7 +47,7 @@ export default function ProjectDetailsPage() {
 
   if (error || !project) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-white">
         <Navigation />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center">
@@ -127,7 +127,8 @@ export default function ProjectDetailsPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="border-primary-blue/20 text-primary-blue hover:bg-primary-blue/5"
+                  style={{ borderColor: "#0055ff", color: "#0055ff" }}
+                  className="hover:bg-[#0055ff] hover:text-white transition-all shadow-sm hover:shadow-md border-2"
                 >
                   <Edit className="w-3.5 h-3.5 mr-1" />
                   Edit Project
@@ -366,7 +367,10 @@ export default function ProjectDetailsPage() {
                 </h3>
 
                 <div className="space-y-3">
-                  <Button className="w-full bg-primary-blue hover:bg-primary-blue-dark text-white flex items-center justify-center gap-2">
+                  <Button
+                    style={{ backgroundColor: "#0055ff" }}
+                    className="w-full hover:opacity-90 text-white flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all"
+                  >
                     <MessageSquare className="w-4 h-4" />
                     Contact Client
                   </Button>
@@ -426,7 +430,8 @@ export default function ProjectDetailsPage() {
               {!isOwner && (
                 <Button
                   variant="outline"
-                  className="w-full border-primary-blue/20 text-primary-blue hover:bg-primary-blue/5 mt-2 mb-4"
+                  style={{ borderColor: "#0055ff", color: "#0055ff" }}
+                  className="w-full hover:bg-[#0055ff] hover:text-white mt-2 mb-4 transition-all shadow-sm hover:shadow-md border-2"
                   size="sm"
                 >
                   <MessageSquare className="w-3.5 h-3.5 mr-1.5" />

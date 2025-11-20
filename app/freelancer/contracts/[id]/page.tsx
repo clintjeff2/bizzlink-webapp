@@ -90,10 +90,13 @@ import {
   AlertOctagon,
   Download,
   ExternalLink,
+  Star,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { Navigation } from "@/components/navigation";
+import { ViewReviewModal } from "@/components/modals/view-review-modal";
+import { useGetReviewByContractQuery } from "@/lib/redux/api/firebaseApi";
 
 // Safe date formatting utility
 const formatDate = (
@@ -193,6 +196,18 @@ export default function FreelancerContractDetailsPage({
   // Contract events
   const [contractEvents, setContractEvents] = useState<ContractEvent[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
+
+  // Review modal
+  const [showReviewModal, setShowReviewModal] = useState(false);
+
+  // Get review for this contract
+  const { data: review } = useGetReviewByContractQuery(
+    {
+      contractId: resolvedParams.id,
+      reviewerId: contract?.clientId || "",
+    },
+    { skip: !resolvedParams.id || !contract?.clientId }
+  );
 
   // Payment history
   const [payments, setPayments] = useState<any[]>([]);
@@ -1159,6 +1174,19 @@ export default function FreelancerContractDetailsPage({
                 </>
               )}
 
+              {(contract.status === "active" ||
+                contract.status === "completed") &&
+                review && (
+                  <Button
+                    variant="outline"
+                    className="text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50 border-yellow-300"
+                    onClick={() => setShowReviewModal(true)}
+                  >
+                    <Star className="h-4 w-4 mr-1" />
+                    View Review
+                  </Button>
+                )}
+
               <Button
                 variant="ghost"
                 onClick={() =>
@@ -1205,9 +1233,7 @@ export default function FreelancerContractDetailsPage({
                 <Button
                   variant="outline"
                   className="w-full"
-                  onClick={() =>
-                    router.push(`/profile/${contract.clientId}`)
-                  }
+                  onClick={() => router.push(`/profile/${contract.clientId}`)}
                 >
                   View Profile
                 </Button>
@@ -2674,6 +2700,18 @@ export default function FreelancerContractDetailsPage({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* View Review Modal */}
+      {review && (
+        <ViewReviewModal
+          isOpen={showReviewModal}
+          onClose={() => setShowReviewModal(false)}
+          review={review}
+          freelancerName={user?.displayName || "You"}
+          clientName={client?.displayName || "Client"}
+          canRespond={true}
+        />
+      )}
     </div>
   );
 }
