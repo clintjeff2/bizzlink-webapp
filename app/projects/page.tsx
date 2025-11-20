@@ -64,7 +64,7 @@ const experienceLevels = [
 // Import Project type
 import { Project } from "@/lib/redux/types/firebaseTypes";
 
-// Professional color palette for card accents
+// Professional color palette for card accents - Bizzlink brand colors
 const cardAccentColors = [
   { border: "border-l-blue-500", bg: "bg-blue-50", text: "text-blue-700" },
   {
@@ -73,26 +73,30 @@ const cardAccentColors = [
     text: "text-emerald-700",
   },
   {
-    border: "border-l-purple-500",
-    bg: "bg-purple-50",
-    text: "text-purple-700",
+    border: "border-l-cyan-500",
+    bg: "bg-cyan-50",
+    text: "text-cyan-700",
   },
-  { border: "border-l-amber-500", bg: "bg-amber-50", text: "text-amber-700" },
-  { border: "border-l-rose-500", bg: "bg-rose-50", text: "text-rose-700" },
+  { border: "border-l-blue-600", bg: "bg-blue-50", text: "text-blue-700" },
   {
-    border: "border-l-indigo-500",
-    bg: "bg-indigo-50",
-    text: "text-indigo-700",
+    border: "border-l-emerald-600",
+    bg: "bg-emerald-50",
+    text: "text-emerald-700",
   },
-  { border: "border-l-teal-500", bg: "bg-teal-50", text: "text-teal-700" },
   {
-    border: "border-l-orange-500",
-    bg: "bg-orange-50",
-    text: "text-orange-700",
+    border: "border-l-cyan-600",
+    bg: "bg-cyan-50",
+    text: "text-cyan-700",
+  },
+  { border: "border-l-blue-700", bg: "bg-blue-50", text: "text-blue-700" },
+  {
+    border: "border-l-emerald-400",
+    bg: "bg-emerald-50",
+    text: "text-emerald-700",
   },
 ];
 
-// Category-specific colors for better organization
+// Category-specific colors for better organization - Bizzlink brand colors
 const categoryColors: Record<
   string,
   { bg: string; text: string; ring: string }
@@ -108,39 +112,39 @@ const categoryColors: Record<
     ring: "ring-emerald-500/10",
   },
   Design: {
-    bg: "bg-purple-100",
-    text: "text-purple-800",
-    ring: "ring-purple-500/10",
+    bg: "bg-cyan-100",
+    text: "text-cyan-800",
+    ring: "ring-cyan-500/10",
   },
   "UI/UX Design": {
-    bg: "bg-rose-100",
-    text: "text-rose-800",
-    ring: "ring-rose-500/10",
+    bg: "bg-blue-100",
+    text: "text-blue-800",
+    ring: "ring-blue-500/10",
   },
   "Digital Marketing": {
-    bg: "bg-amber-100",
-    text: "text-amber-800",
-    ring: "ring-amber-500/10",
+    bg: "bg-emerald-100",
+    text: "text-emerald-800",
+    ring: "ring-emerald-500/10",
   },
   "Data Science": {
-    bg: "bg-indigo-100",
-    text: "text-indigo-800",
-    ring: "ring-indigo-500/10",
+    bg: "bg-cyan-100",
+    text: "text-cyan-800",
+    ring: "ring-cyan-500/10",
   },
   "Writing & Content": {
-    bg: "bg-teal-100",
-    text: "text-teal-800",
-    ring: "ring-teal-500/10",
+    bg: "bg-blue-100",
+    text: "text-blue-800",
+    ring: "ring-blue-500/10",
   },
   "Video & Animation": {
-    bg: "bg-orange-100",
-    text: "text-orange-800",
-    ring: "ring-orange-500/10",
+    bg: "bg-emerald-100",
+    text: "text-emerald-800",
+    ring: "ring-emerald-500/10",
   },
   "Music & Audio": {
-    bg: "bg-pink-100",
-    text: "text-pink-800",
-    ring: "ring-pink-500/10",
+    bg: "bg-cyan-100",
+    text: "text-cyan-800",
+    ring: "ring-cyan-500/10",
   },
   General: {
     bg: "bg-gray-100",
@@ -829,12 +833,12 @@ export default function ProjectsPage() {
                       <div className="flex items-center gap-2 mb-2">
                         {project.timeline?.isUrgent && (
                           <Badge className="bg-gradient-to-r from-red-500 to-red-600 text-white text-xs px-2.5 py-1 ring-2 ring-red-200 shadow-sm">
-                          Urgent
+                            Urgent
                           </Badge>
                         )}
                         {project.visibility === "public" && (
-                          <Badge className="bg-gradient-to-r from-amber-400 to-amber-500 text-white text-xs px-2.5 py-1 ring-2 ring-amber-200 shadow-sm">
-                          Featured
+                          <Badge className="bg-gradient-to-r from-cyan-400 to-blue-500 text-white text-xs px-2.5 py-1 ring-2 ring-cyan-200 shadow-sm">
+                            Featured
                           </Badge>
                         )}
                         <Badge
@@ -941,7 +945,7 @@ export default function ProjectsPage() {
                       >
                         <Button
                           size="sm"
-                          className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-green-500 hover:from-blue-700 hover:to-green-600 text-white font-semibold transition-all duration-200 shadow-md hover:shadow-lg ring-2 ring-blue-200"
+                          className="w-full rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-all duration-200 shadow-md hover:shadow-lg"
                         >
                           View Details
                         </Button>
@@ -963,13 +967,13 @@ export default function ProjectsPage() {
                             size="sm"
                             className={`w-full rounded-xl font-semibold transition-all duration-200 shadow-md hover:shadow-lg ${
                               appliedProjectIds.has(project.projectId)
-                                ? "bg-gradient-to-r from-amber-500 via-amber-600 to-orange-500 hover:from-amber-600 hover:via-amber-700 hover:to-orange-600 text-white ring-2 ring-amber-200"
-                                : "bg-gradient-to-r from-emerald-500 via-green-600 to-emerald-600 hover:from-emerald-600 hover:via-green-700 hover:to-emerald-700 text-white ring-2 ring-emerald-200"
+                                ? "bg-cyan-600 hover:bg-cyan-700 text-white"
+                                : "bg-emerald-600 hover:bg-emerald-700 text-white"
                             }`}
                           >
                             {appliedProjectIds.has(project.projectId)
-                              ? "✏️ Edit"
-                              : "🚀 Apply"}
+                              ? "Edit"
+                              : "Apply"}
                           </Button>
                         </Link>
                       )}
