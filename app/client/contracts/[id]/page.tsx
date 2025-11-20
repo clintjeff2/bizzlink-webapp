@@ -98,6 +98,9 @@ import {
   isProviderAvailableInCountry,
   MOBILE_MONEY_COUNTRIES,
 } from "@/lib/utils/payments/mobile-money-validation";
+import { RateFreelancerModal } from "@/components/modals/rate-freelancer-modal";
+import { useGetReviewByContractQuery } from "@/lib/redux/api/firebaseApi";
+import { Star } from "lucide-react";
 
 const statusColors: Record<string, string> = {
   pending_acceptance: "bg-amber-100 text-amber-800 border-amber-200",
@@ -150,6 +153,16 @@ export default function ContractDetailsPage({
   const [showActivityApproveDialog, setShowActivityApproveDialog] =
     useState(false);
   const [selectedMilestone, setSelectedMilestone] = useState<any>(null);
+  const [showRatingModal, setShowRatingModal] = useState(false);
+
+  // Get existing review for this contract
+  const { data: existingReview } = useGetReviewByContractQuery(
+    {
+      contractId: resolvedParams.id,
+      reviewerId: user?.userId || "",
+    },
+    { skip: !resolvedParams.id || !user?.userId }
+  );
 
   // Calculate total contract amount from milestones
   const totalContractAmount =
@@ -1593,6 +1606,13 @@ export default function ContractDetailsPage({
                     <PauseCircle className="h-4 w-4 mr-1" />
                     Pause Contract
                   </Button>
+                  <Button
+                    onClick={() => setShowRatingModal(true)}
+                    className="bg-yellow-500 hover:bg-yellow-600 text-white"
+                  >
+                    <Star className="h-4 w-4 mr-1" />
+                    {existingReview ? "Edit Review" : "Rate Freelancer"}
+                  </Button>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button
@@ -1657,12 +1677,23 @@ export default function ContractDetailsPage({
 
               {(contract.status === "completed" ||
                 contract.status === "cancelled") && (
-                <Button
-                  variant="outline"
-                  onClick={() => router.push("/client/projects")}
-                >
-                  Create New Project
-                </Button>
+                <>
+                  {contract.status === "completed" && (
+                    <Button
+                      onClick={() => setShowRatingModal(true)}
+                      className="bg-yellow-500 hover:bg-yellow-600 text-white"
+                    >
+                      <Star className="h-4 w-4 mr-1" />
+                      {existingReview ? "Edit Review" : "Rate Freelancer"}
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    onClick={() => router.push("/client/projects")}
+                  >
+                    Create New Project
+                  </Button>
+                </>
               )}
 
               <Button
@@ -3303,6 +3334,21 @@ export default function ContractDetailsPage({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Rate Freelancer Modal */}
+      {contract && freelancer && (
+        <RateFreelancerModal
+          isOpen={showRatingModal}
+          onClose={() => setShowRatingModal(false)}
+          contractId={contract.id}
+          projectId={contract.projectId}
+          freelancerId={contract.freelancerId}
+          freelancerName={freelancer.displayName || "Freelancer"}
+          freelancerPhotoURL={freelancer.photoURL}
+          clientId={user?.userId || ""}
+          existingReview={existingReview}
+        />
+      )}
     </div>
   );
 }
